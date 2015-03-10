@@ -1,0 +1,77 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+case $# in
+  [01]) prj_fail 'usage: sp-links /path/to/pkg/dir /global/dir [...]';;
+  *) :;;
+esac &&
+prj_set prj_program sp-links &&
+
+prj_set_default SP_REPLACE_LINKS y &&
+
+prj_set dir "$1" && shift &&
+case ${dir?} in
+  ''|[!/]*) prj_fail 'path must begin with "/": '"${dir?}";;
+  */) :;;
+  *) dir=${dir?}/;;
+esac &&
+
+prj_unset global safe_globale new file target &&
+for global in ${1+"$@"}; do
+  if test '' = "${global?}"
+    then prj_fail 'paths must not be empty'
+    else :
+  fi || exit "$?"
+done &&
+
+set "${dir?}"/[*] "${dir?}"/* '' ${1+"$@"} &&
+if test "$1 $2" = "${dir?}/[*] ${dir?}/*"
+  then exit 0
+  else shift
+fi &&
+
+prj_set start n &&
+for global in ${1+"$@"}; do
+  { if test "${start?}" = y; then :; else
+      if test '' = "${global?}"; then start=y; else :; fi &&
+      continue
+    fi &&
+    case ${global?} in
+      /*) safe_global=${global?};;
+      *) safe_global=./${global?};;
+    esac &&
+    new=${safe_global?}'/.{new}' &&
+    { test -d "${new?}"/. || mkdir "${new?}"; } &&
+    for file in ${1+"$@"}; do
+      { if test '' = "${file?}"; then break; else :; fi &&
+        file=`prj_basename "${file?}"` &&
+        if test n = "${SP_REPLACE_LINKS?}"; then
+          if test -h "${safe_global?}/${file?}"; then
+            target=`readlink "${safe_global?}/${file?}"` &&
+            if test x"${target?}" != x"${dir?}${file?}"
+              then prj_warn \
+                "not replacing link ${global?}/${file?} -> ${target?}"
+              else :
+            fi &&
+            continue
+          elif test -f "${safe_global?}/${file?}"; then
+            prj_warn "not replacing file ${global?}/${file?}" &&
+            continue
+          else :
+          fi
+        else :
+        fi &&
+        rm -f "${new?}/${file?}" &&
+        ln -s "${dir?}${file?}" "${new?}"/ &&
+        mv -f "${new?}/${file?}" "${safe_global?}"/
+      } || exit "$?"
+    done &&
+    { rmdir "${new?}" || :; }
+  } || exit "$?"
+done

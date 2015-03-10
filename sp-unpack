@@ -1,0 +1,50 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+if test "$#" = 0
+  then prj_fail 'usage: sp-unpack /package/admin/foo-1.2.3 [...]'
+  else :
+fi &&
+prj_set prj_program sp-unpack &&
+sp_validate_root &&
+prj_set_default SP_REUNPACK n &&
+
+prj_unset tmpdir &&
+while test "$#" != 0; do
+  { sp_path=`prj_sedarg1 's%/*$%%' "$1"` && shift &&
+    sp_parse "${sp_path?}" &&
+    if prj_is_set sp_category
+      then :
+      else prj_fail "path must be under [\$SP_ROOT]/package: ${sp_path?}"
+    fi &&
+    if test n = "${SP_REUNPACK?}" && test -d "${sp_path?}"/.
+      then continue
+      else :
+    fi &&
+    sp-download "${sp_path?}" &&
+    sp_find_tar &&
+    if test not_found = "${sp_tar?}"
+      then prj_fail "no tarball found for ${sp_path?}"
+      else :
+    fi &&
+    if test "${sp_ext?}" != ''; then
+      { prj_is_set tmpdir || prj_tmpdir tmpdir; } &&
+      if test "${sp_ext?}" = .bz2; then bunzip2; else gunzip; fi \
+        < "${sp_tar?}" > "${tmpdir?}"/tar &&
+      sp_tar=${tmpdir?}/tar
+    else :
+    fi &&
+    sp_unpack
+  } || exit "$?"
+done &&
+
+if prj_is_set tmpdir
+  then exec rm -rf "${tmpdir?}"
+  else :
+fi

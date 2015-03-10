@@ -1,0 +1,62 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_unset package package_dir package_base package_version subdir link \
+  target &&
+package=$1 &&
+package_base=`prj_basename "${package?}"` &&
+if test "$#" = 0 ||
+   test '' = "${package_base?}" ||
+   prj_match '[!/]*' "${package?}" ||
+   prj_match "*${sp_dashdigit?}*" "${package_base?}"
+  then prj_fail 'usage: sp-freeze /package/admin/foo [/package/misc ...]'
+  else :
+fi &&
+shift &&
+prj_set prj_program sp-freeze &&
+sp_validate_root &&
+
+target=${package?} &&
+while :; do
+  { package_dir=`prj_dirname "${target?}"` &&
+    target=`readlink "${target?}"` &&
+    { prj_match '/*' "${target?}" || target=${package_dir?}${target?}; } &&
+    package_base=`prj_basename "${target?}"` &&
+    if prj_match "*${sp_dashdigit?}*" "${package_base?}"
+      then break
+      else :
+    fi
+  } || exit "$?"
+done &&
+package_version=${target?} &&
+package_base=`prj_basename "${package?}"` &&
+
+sp_process_package_version() {
+  for subdir in spf conf; do
+    { link=${sp_dir?}${sp_base?}${sp_version?}/${subdir?}/${package_base?} &&
+      if test -h "${link?}"; then
+        target=`readlink "${link?}"` &&
+        if test "${package?}" = "${target?}"; then
+          prj_echo "updating: ${link?}" &&
+          { test -d "${link?}{new}" || mkdir "${link?}{new}"; } &&
+          rm -f "${link?}{new}/${package_base?}" &&
+          ln -s "${package_version?}" "${link?}{new}/${package_base?}" &&
+          mv -f "${link?}{new}/${package_base?}" \
+            "${sp_dir?}${sp_base?}${sp_version?}/${subdir?}/" &&
+          rmdir "${link?}{new}"
+        else
+          prj_echo "specific version: ${link?}"
+        fi
+      else :
+      fi
+    } || return "$?"
+  done
+} &&
+
+sp_for_each_package ${1+"$@"}

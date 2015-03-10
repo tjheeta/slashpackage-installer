@@ -1,0 +1,59 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_set prj_program sp-check &&
+sp_validate_root &&
+prj_set_default SP_NON_DIR y &&
+prj_set_default SP_CUR_LINK y &&
+prj_set_default SP_MULT_VER y &&
+prj_set_default SP_CUR_NAME y &&
+
+sp_process_non_directory() {
+  if test y = "${SP_NON_DIR?}"
+    then prj_echo "not a directory: ${sp_path?}"
+    else :
+  fi &&
+  sp_skip=n
+} &&
+
+if test y = "${SP_CUR_LINK?}"; then
+  sp_process_package_current() {
+    test -h "${sp_path?}" ||
+    prj_echo "current-version directory is not a symlink: ${sp_path?}"
+  }
+else :
+fi &&
+
+sp_process_package_version() {
+  check_multiple "${sp_path?}" "${sp_dir?}${sp_base?}"-[0123456789]* &&
+  check_cur_name
+} &&
+
+if test y = "${SP_MULT_VER?}"
+  then check_multiple() { test "$#" = 2 || prj_echo "multiple versions: $1"; }
+  else check_multiple() { :; }
+fi &&
+
+if test y = "${SP_CUR_NAME?}"; then
+  check_cur_name() {
+    case ${sp_dir?} in
+      /*) :;;
+      *) sp_dir=./${sp_dir?};;
+    esac &&
+    { test -h "${sp_dir?}${sp_base?}" ||
+      test -d "${sp_dir?}${sp_base?}" ||
+      test -f "${sp_dir?}${sp_base?}" ||
+      prj_echo "no current version: ${sp_path?}"
+    }
+  }
+else
+  check_cur_name() { :; }
+fi &&
+
+sp_for_each_package ${1+"$@"}

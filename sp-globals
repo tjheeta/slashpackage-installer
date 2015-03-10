@@ -1,0 +1,45 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_set prj_program sp-globals &&
+sp_validate_root &&
+prj_set_default SP_GLOBAL /command &&
+prj_set_default SP_PER_PKG ' command bin sbin' &&
+
+prj_unset per_package_dir file_path file_base global_path target &&
+
+sp_process_package_current() {
+  eval "set x ${SP_PER_PKG?}" && shift &&
+  for per_package_dir in ${1+"$@"}; do
+    { set x "${sp_path?}/${per_package_dir?}"/[*] \
+        "${sp_path?}/${per_package_dir?}"/* &&
+      if test "$# $2 $3" = \
+              "3 ${sp_path?}/${per_package_dir?}/[*] ${sp_path?}/${per_package_dir?}/*"
+        then continue
+        else shift && shift
+      fi &&
+      for file_path in "$@"; do
+        { file_base=`prj_basename "${file_path?}"` &&
+          global_path="$SP_ROOT${SP_GLOBAL?}/${file_base?}" &&
+          if test -h "${global_path?}"
+            then :
+            else prj_echo "missing: ${file_base?} -> ${file_path?}" && continue
+          fi &&
+          target=`readlink "${global_path?}"` &&
+          if test x"${target?}" = x"${file_path?}"
+            then :
+            else prj_echo "conflict: ${file_base?} -> ${target?} != ${file_path?}"
+          fi
+        } || return "$?"
+      done
+    } || return "$?"
+  done
+} &&
+
+sp_for_each_package ${1+"$@"}

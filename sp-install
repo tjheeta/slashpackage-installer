@@ -1,0 +1,299 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+if test "$#" = 0; then
+  prj_fail \
+    'usage: sp-install {/package/admin/foo-1.2.3|foo-1.2.3.tar.gz} [...]'
+else :
+fi &&
+prj_set prj_program sp-install &&
+sp_validate_root &&
+
+case $SP_STOP_AFTER in
+  ''|configure|build|version|links) :;;
+  *) '$SP_STOP_AFTER must be "configure", "build", "version", "links", or empty';;
+esac &&
+
+prj_set_default SP_CLEAN            y &&
+prj_set_default SP_TRUST_INSTALL    n &&
+prj_set_default SP_KEEP_COMPILE     n &&
+prj_set_default SP_COMPAT           y &&
+prj_set_default SP_SKIP_TEST        n &&
+prj_set_default SP_IGNORE_TEST_FAIL n &&
+prj_u2 prj_capture sp_uid prj_id -u &&
+if test 0 = "${sp_uid?}"
+  then prj_set_default SP_DO_OWN y
+  else prj_set_default SP_DO_OWN n
+fi &&
+prj_unset tmpdir tmp0 tmp1 line uid gid url &&
+if prj_is_set SPF_CONF
+  then prj_set is_set_spf_conf y
+  else prj_set is_set_spf_conf n
+fi &&
+
+skip_reconfig_() {
+  if prj_not prj_match '"$SP_ROOT"/*' "${line?}" && prj_match '/*' "${line?}" &&
+     prj_exists "$SP_ROOT${line?}"
+    then return 100
+    else :
+  fi
+} &&
+
+conf_home_() {
+  : "${1?}" &&
+  if test -f "$1" && { test x"${2-$1}" = x"$1" || prj_not test -f "$2"; }; then
+    line=`sed q < "$1"` &&
+    if test "${sp_path?}" = "${line?}"; then :; else
+      { prj_echo "${sp_path?}" && sed 1d < "$1"; } > "${2-$1}{new}" &&
+      mv -f "${2-$1}{new}" "${2-$1}"
+    fi
+  else :
+  fi
+} &&
+
+conf_compile_user_() {
+  set "${sp_path?}"/conf-compile/"$1"compile_user \
+    "${sp_path?}"/conf-compile/compile_user &&
+  if test -f "$1" && prj_is_set SP_COMPILE_USER &&
+     { test "$1" = "$2" || prj_not test -f "$2"; }; then
+    { prj_echo "${SP_COMPILE_USER?}" && sed 1d < "$1"; } > "$2{new}" &&
+    mv -f "$2{new}" "$2"
+  else :
+  fi
+} &&
+
+while test "$#" != 0; do
+  { tmp0=$1 && shift &&
+
+    case ${tmp0?} in
+      http://*|ftp://*)
+        { prj_is_set tmpdir || prj_tmpdir tmpdir; } &&
+        url=${tmp0?} &&
+        tmp0=`prj_basename "${url?}"` &&
+        prj_download "${url?}" "${tmpdir?}" "${tmp0?}" &&
+        tmp0=${tmpdir?}/${tmp0?};;
+      /*) :;;
+      *) tmp0=./${tmp0?};;
+    esac &&
+
+    if test -f "${tmp0?}"; then
+      { prj_is_set tmpdir || prj_tmpdir tmpdir; } &&
+      sp_tar=${tmpdir?}/package.tar &&
+      case ${tmp0?} in
+        *.bz2) tmp1=bunzip2;;
+        *.gz|*.Z) tmp1=gunzip;;
+        *) sp_tar=${tmp0?} && tmp1=:;;
+      esac &&
+      "${tmp1?}" < "${tmp0?}" > "${tmpdir?}"/package.tar &&
+      tar -tf - < "${sp_tar?}" > "${tmpdir?}"/list &&
+      prj_capture tmp1 sed '$!d
+s%\('"${sp_dashdigit?}"'[^/]*\)/.*$%\1%' < "${tmpdir?}"/list &&
+      sp_parse "$SP_ROOT/package/${tmp1?}" &&
+      sp_hook BEFORE_UNPACK &&
+      { test "${sp_hook_status?}" != 99 || continue; } &&
+      sp_unpack
+    else
+      tmp0=`prj_sedarg1 's%/*$%%' "${tmp0?}"` &&
+      sp_parse "${tmp0?}" &&
+      if prj_is_set sp_category
+        then :
+        else prj_fail "path must be under [\$SP_ROOT]/package: ${sp_path?}"
+      fi &&
+      if test "${sp_version?}" != ''; then :; else
+        for url in "${sp_root?}" '' end; do
+          if test "${url?}" = end
+            then prj_fail 'unable to find URL file'
+            else :
+          fi &&
+          url=${url?}/package/"${sp_category?}${sp_base?}"/package/url_src_latest &&
+          if test -f "${url?}"
+            then break
+            else :
+          fi || exit "$?"
+        done &&
+        url=`sed q < "${url?}"` &&
+        { prj_is_set tmpdir || prj_tmpdir tmpdir; } &&
+        tmp0=`prj_basename "${url?}"` &&
+        prj_download "${url?}" "${tmpdir?}" "${tmp0?}" &&
+        tmp0=`sed q "${tmpdir?}/${tmp0?}"` &&
+        if prj_match "${sp_dashdigit?}*" "-${tmp0?}"; then :; else
+          prj_fail "version must begin with a digit: ${tmp0?}"
+        fi &&
+        sp_parse "${sp_path?}-${tmp0?}"
+      fi &&
+      sp_hook BEFORE_UNPACK &&
+      { test "${sp_hook_status?}" != 99 || continue; } &&
+      sp-unpack "${sp_path?}"
+    fi &&
+    sp_hook AFTER_UNPACK &&
+    if test "${sp_hook_status?}" = 99 || test unpack = "$SP_STOP_AFTER"
+      then continue
+      else :
+    fi &&
+
+    if test "${is_set_spf_conf?}" = y; then :
+    else prj_x2 prj_set SPF_CONF "${sp_path?}"/conf
+    fi &&
+
+    if test -d "${sp_path?}"/conf-compile/defaults/.; then
+      conf_home_ "${sp_path?}"/conf-compile/defaults/package_home \
+        "${sp_path?}"/conf-compile/package_home &&
+      conf_compile_user_ defaults/ &&
+      if test '' = "$SP_ROOT"; then :; else
+        for tmp0 in "${sp_path?}"/conf-compile/defaults/depend_*; do
+          { if test -f "${tmp0?}"; then :; else continue; fi &&
+            tmp1="${sp_path?}"/conf-compile/`prj_basename "${tmp0?}"` &&
+            if test -f "${tmp1?}"; then continue; else :; fi &&
+            line=`sed q < "${tmp0?}"` &&
+            if skip_reconfig_; then continue; else :; fi &&
+            { prj_echo "$SP_ROOT${line?}" && sed 1d < "${tmp0?}"; } > "${tmp1?}{new}" &&
+            mv -f "${tmp1?}{new}" "${tmp1?}"
+          } || exit "$?"
+        done
+      fi
+    else
+      if test -f "${sp_path?}"/conf-compile/package_home
+        then conf_home_ "${sp_path?}"/conf-compile/package_home
+        else conf_home_ "${sp_path?}"/src/conf-home
+      fi &&
+      conf_compile_user_ &&
+      if test '' != "$SP_ROOT"; then
+        for tmp0 in "${sp_path?}"/conf-compile/depend_*; do
+          { if test -f "${tmp0?}"; then :; else continue; fi &&
+            line=`sed q < "${tmp0?}"` &&
+            if skip_reconfig_; then continue; else :; fi &&
+            { prj_echo "$SP_ROOT${line?}" &&
+              sed 1d < "${tmp0?}"
+            } > "${tmp0?}{new}" &&
+            mv -f "${tmp0?}{new}" "${tmp0?}"
+          } || exit "$?"
+        done &&
+        if test -f "${sp_path?}"/conf-compile/import; then
+          tmp0=1 &&
+          while :; do
+            { line=`sed "${tmp0?}"\!d < "${sp_path?}"/conf-compile/import` &&
+              if test '' = "${line?}"; then break; else :; fi &&
+              tmp1=${tmp0?} &&
+              tmp0=`expr "${tmp0?}" + 1` &&
+              if skip_reconfig_; then continue; else :; fi &&
+              { sed "${tmp1?}",\$d < "${sp_path?}"/conf-compile/import &&
+                prj_echo "$SP_ROOT${line?}" &&
+                sed 1,"${tmp1?}"d < "${sp_path?}"/conf-compile/import
+              } > "${sp_path?}"/conf-compile/import'{new}' &&
+              mv -f "${sp_path?}"/conf-compile/import'{new}' \
+                "${sp_path?}"/conf-compile/import
+            } || exit "$?"
+          done
+        else :
+        fi
+      else :
+      fi
+    fi &&
+    sp_hook AFTER_CONFIGURE &&
+    { test "${sp_hook_status?}" != 99 || continue; } &&
+
+    if test y = "${SP_CLEAN?}"; then rm -rf "${sp_path?}"/compile; else :; fi &&
+    if test y = "${SP_TRUST_INSTALL?}"; then
+      { test '' = "$SP_STOP_AFTER" ||
+        prj_fail '$SP_TRUST_INSTALL=y is incompatible with $SP_STOP_AFTER='"${SP_STOP_AFTER?}"
+      } &&
+      ( cd "${sp_path?}" && package/install ) &&
+      sp_hook AFTER_INSTALL &&
+      if test n = "${SP_KEEP_COMPILE?}"; then rm -rf compile; else :; fi &&
+      continue
+    else :
+    fi &&
+
+    if prj_is_set SP_COMPILE_USER; then
+      uid=`prj_id -u "${SP_COMPILE_USER?}"` &&
+      chown -R "${uid?}" "${sp_path?}"/. &&
+      ( cd "${sp_path?}" && setuidgid "${SP_COMPILE_USER?}" package/compile ) &&
+      uid=`prj_id -u` &&
+      gid=`prj_id -g` &&
+      chown -R "${uid?}:${gid?}" "${sp_path?}"/.
+    else
+      ( cd "${sp_path?}" && exec package/compile )
+    fi &&
+    sp_hook AFTER_COMPILE &&
+    { test "${sp_hook_status?}" != 99 || continue; } &&
+
+    if test y = "${SP_DO_OWN?}" && test -x "${sp_path?}"/package/own
+      then ( cd "${sp_path?}" && exec package/own )
+      else :
+    fi &&
+    sp_hook AFTER_OWN &&
+    { test "${sp_hook_status?}" != 99 || continue; } &&
+
+    if test y = "${SP_SKIP_TEST?}"; then :
+    elif test -x "${sp_path?}"/package/check; then
+      if test n = "${SP_IGNORE_TEST_FAIL?}"; then
+        ( cd "${sp_path?}" && exec package/check )
+      else
+        ( cd "${sp_path?}" && exec package/check ) ||
+        { prj_warn "tests failed for ${sp_path?}" &&
+          if test skip = "${SP_IGNORE_TEST_FAIL?}"; then continue; else :; fi
+        }
+      fi
+    else :
+    fi &&
+    sp_hook AFTER_CHECK &&
+    { test "${sp_hook_status?}" != 99 || continue; } &&
+
+    if test n = "${SP_KEEP_COMPILE?}"
+      then rm -rf "${sp_path?}"/compile
+      else :
+    fi &&
+    sp_hook AFTER_CLEAN &&
+    if test "${sp_hook_status?}" = 99 || test build = "$SP_STOP_AFTER"
+      then continue
+      else :
+    fi &&
+
+    sp-version "${sp_path?}" &&
+    sp_hook AFTER_VERSION &&
+    if test "${sp_hook_status?}" = 99 || test version = "$SP_STOP_AFTER"
+      then continue
+      else :
+    fi &&
+
+    if test -d "${sp_dir?}${sp_base?}"/command/.; then
+      ( case ${sp_dir?} in
+          "$SP_ROOT"/package/host/*|/package/host/*)
+            # host/* commands probably aren't registered,
+            # so don't let them override existing symlinks
+            prj_x2 prj_set_default SP_REPLACE_LINKS n;;
+          *) :;;
+        esac &&
+        set "$SP_ROOT"/command &&
+        if test y = "${SP_COMPAT?}"
+          then set "$@" "$SP_ROOT"/usr/local/bin
+          else :
+        fi &&
+        exec sp-links "${sp_dir?}${sp_base?}"/command "$@" )
+    else :
+    fi &&
+    sp_hook AFTER_LINKS &&
+    if test "${sp_hook_status?}" = 99 || test links = "$SP_STOP_AFTER"
+      then continue
+      else :
+    fi &&
+
+    if test -f "${sp_dir?}${sp_base?}"/package/run
+      then ( cd "${sp_dir?}${sp_base?}" && exec package/run )
+      else :
+    fi &&
+    sp_hook AFTER_RUN
+
+  } || exit "$?"
+done &&
+
+if prj_is_set tmpdir
+  then rm -rf "${tmpdir?}"
+  else :
+fi

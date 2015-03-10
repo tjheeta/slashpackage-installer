@@ -1,0 +1,65 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_set prj_program sp-version &&
+prj_unset category package version tmp &&
+
+if test "$#" = 1; then
+  version=`prj_sedarg1 's%/*$%%' "$1"` &&
+  case ${version?} in
+    */*) category=`prj_dirname "${version?}"` &&
+         version=`prj_basename "${version?}"`;;
+    *) category=.;;
+  esac &&
+  case ${version?} in
+    *-[0123456789]*) :;;
+    *) prj_fail 'no version given';;
+  esac &&
+  package=`prj_sedarg1 's%-[0123456789].*$%%' "${version?}"`
+elif test "$#" = 3; then
+  category=$1/ &&
+  package=$2 &&
+  version=$2-$3 &&
+  case ${package?} in
+    *-[0123456789]*) prj_fail 'package must not contain "-[0-9]".';;
+    *) :;;
+  esac &&
+  case $3 in
+    [0123456789]*) :;;
+    *) prj_fail 'version must begin with a digit';;
+  esac &&
+  case ${version?} in
+    */*) prj_fail 'package and version must not contain "/".';;
+    *) :;;
+  esac
+else
+  unset prj_program &&
+  prj_fail 'usage: sp-version [/category/]package-version'
+fi &&
+
+case ${category?} in
+  /*) cd "${category?}";;
+  *) cd ./"${category?}";;
+esac &&
+if test -d "${version?}"/.
+  then :
+  else prj_fail "no such directory: ${category?}${version?}"
+fi &&
+
+if prj_dir_eq "${package?}" "${version?}"
+  then exit 0
+  else :
+fi &&
+
+tmp=${version?}'{new}' &&
+rm -rf ./"${tmp?}" &&
+mkdir ./"${tmp?}" &&
+ln -s "${version?}" "${tmp?}/${package?}" &&
+mv -f "${tmp?}/${package?}" . &&
+exec rmdir "${tmp?}"
