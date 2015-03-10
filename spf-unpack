@@ -1,0 +1,261 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+{ test "$#" != 0 ||
+  prj_fail \
+    'usage: spf-unpack /package/host/example.org/foreign/foo-1.2.3 [...]'; } &&
+prj_set prj_program spf-unpack &&
+sp_validate_root &&
+prj_set_default SP_REUNPACK n &&
+
+prj_unset spf_tmp_ spf_caller_id_ spf_dir_ &&
+
+prj_unset spf_cc_file &&
+spf_make_cc_files() {
+  { test "$#" != 0 || return 0; } &&
+  prj_mkdir_p "${spf_path_cc?}"/defaults &&
+  for spf_cc_file in ${1+"$@"}; do
+    { eval "set x ${spf_cc_file?}" && shift &&
+      prj_echo "$2
+
+$3" > "${sp_path?}"/conf-compile/defaults/"$1"
+    } || return "$?"
+  done
+} &&
+
+spf_caller_id_=`prj_id -u` &&
+spf_caller_id_=${spf_caller_id_?}:`prj_id -g` &&
+if prj_is_set SP_COMPILE_USER; then
+  sp_id=`prj_id -u "${SP_COMPILE_USER?}"` &&
+  spf_unpack_() { ( cd "${spf_dir_?}" && setuidgid "${SP_COMPILE_USER?}" "$@" ); }
+else
+  spf_unpack_() { ( cd "${spf_dir_?}" && "$@" ); }
+fi &&
+
+spf_process_url_() {
+  sp_tar_base=`prj_basename "${1?}"` &&
+  sp_find_tar &&
+  { test not_found != "${sp_tar?}" ||
+    prj_fail "no tarball found for ${sp_path?}"; } &&
+  case ${sp_tar_base?} in
+    *.tgz|*.gz|*.bz2|*.lzma|*.xz|*.Z)
+      { prj_is_set spf_tmpdir_ || prj_tmpdir spf_tmpdir_; } &&
+      spf_tmp_='
+/\.tgz$/{
+s%\.tgz$%.tar%
+q
+}
+/\.gz$/{
+s%\.gz$%%
+q
+}
+/\.bz2$/{
+s%\.bz2$%%
+q
+}
+/\.lzma$/{
+s%\.lzma$%%
+q
+}
+/\.xz$/{
+s%\.xz$%%
+q
+}
+/\.Z$/{
+s%\.Z$%%
+q
+}' &&
+      spf_tmp_=`prj_sedarg1 "${spf_tmp_?}" "${sp_tar_base?}"` &&
+      case ${sp_tar_base?} in
+        *.bz2)  bunzip2;;
+        *.lzma) lzma d -si -so;;
+        *.xz)   xz -d;;
+        *)      gunzip;;
+      esac < "${sp_tar?}" > "${spf_tmpdir_?}/${spf_tmp_?}" &&
+      sp_tar=${spf_tmpdir_?}/${spf_tmp_?};;
+    *) :;;
+  esac &&
+  spf_dir_=${spf_path_compile?}/tmp/src/${2?} &&
+  if test '' != "${3?}"; then
+    spf_url_src_attr_fmt_=$3
+  else
+    case ${sp_tar?} in
+      *.tar)   spf_url_src_attr_fmt_=tar;;
+      *.zip)   spf_url_src_attr_fmt_=zip;;
+      *.cpio)  spf_url_src_attr_fmt_=cpio;;
+      *.shar)  spf_url_src_attr_fmt_=shar;;
+      *.patch) spf_url_src_attr_fmt_=patch;;
+      *.diff)  spf_url_src_attr_fmt_=patch;;
+      *.rpm)   spf_url_src_attr_fmt_=srpm;;
+      *) prj_fail "unknown file type: ${sp_tar?}";;
+    esac
+  fi &&
+  shift &&
+  shift &&
+  shift &&
+  prj_u2 prj_set spf_saved_tmpdir "${TMPDIR-/tmp}" &&
+  prj_x2 prj_set TMPDIR "${spf_path_compile?}"/unpack-tmp &&
+  spf_format_"${spf_url_src_attr_fmt_?}"_ ${1+"$@"} &&
+  prj_x2 prj_set TMPDIR "${spf_saved_tmpdir?}"
+} &&
+
+spf_process_urls_() {
+  while test "$#" != 0; do
+    { eval "spf_process_url_ $1" &&
+      shift
+    } || return "$?"
+  done
+} &&
+
+spf_format_tar_()  { spf_unpack_ tar -xf - < "${sp_tar?}"; } &&
+
+spf_format_zip_()  { spf_unpack_ unzip "${sp_tar?}"; } &&
+
+spf_format_cpio_() { spf_unpack_ cpio -idm < "${sp_tar?}"; } &&
+
+spf_format_shar_() {
+  spf_tmp_=`prj_basename "${sp_tar?}"` &&
+  { prj_is_set spf_tmpdir_ || prj_tmpdir spf_tmpdir_; } &&
+  sed -n '/^#!/,$p' < "${sp_tar?}" \
+    > "${spf_tmpdir_?}"/post-sed-"${spf_tmp_?}" &&
+  spf_unpack_ sh "${spf_tmpdir_?}"/post-sed-"${spf_tmp_?}"
+} &&
+
+spf_format_patch_() {
+  set x "${1-}" "${2-}" && shift &&
+  case $1 in
+    '') :;;
+    *[!0123456789]*) :;;
+    *) set "$@" -p"$1";;
+  esac &&
+  if test R = "$2"
+    then set "$@" -R
+    else :
+  fi &&
+  shift && shift &&
+  spf_unpack_ patch ${1+"$@"} < "${sp_tar?}"
+} &&
+
+spf_format_srpm_() {
+  prj_u2 prj_set spf_srpm_offset_ 104 &&
+  prj_capture spf_tmp_ \
+    od -j "${spf_srpm_offset_?}" -N 8 -t u1 < "${sp_tar?}" &&
+  prj_capture spf_tmp_ spf_offset_ ${spf_tmp_?} &&
+  prj_capture spf_srpm_offset_ expr "${spf_srpm_offset_?}" + "${spf_tmp_?}" + \
+    \( 8 - \( "${spf_tmp_?}" \% 8 \) \) \% 8 + 8 &&
+  prj_capture spf_tmp_ \
+    od -j "${spf_srpm_offset_?}" -N 8 -t u1 < "${sp_tar?}" &&
+  prj_capture spf_tmp_ spf_offset_ ${spf_tmp_?} &&
+  prj_capture spf_srpm_offset_ expr "${spf_srpm_offset_?}" + "${spf_tmp_?}" &&
+  { prj_is_set spf_tmpdir_ || prj_tmpdir spf_tmpdir_; } &&
+  rm -rf "${spf_tmpdir_?}"/* &&
+  dd ibs="${spf_srpm_offset_?}" skip=1 \
+    < "${sp_tar?}" > "${spf_tmpdir_?}"/srpm.tmp 2> /dev/null &&
+  prj_capture spf_tmp_ file - < "${spf_tmpdir_?}"/srpm.tmp &&
+  case ${spf_tmp_?} in
+    *': bzip2 compressed data,'*) bunzip2;;
+    *': gzip compressed data,'*)  gzip;;
+    *) prj_fail "unrecognized compression format: ${spf_tmp_?}";;
+  esac < "${spf_tmpdir_?}"/srpm.tmp > "${spf_tmpdir_?}"/srpm.cpio &&
+  sp_tar=${spf_tmpdir_?}/srpm.cpio &&
+  spf_format_cpio_
+} &&
+spf_offset_() {
+  expr 16 \* \( 256 \* \( 256 \* \( 256 \* "$2" + "$3" \) + "$4" \) + "$5" \) \
+    +           256 \* \( 256 \* \( 256 \* "$6" + "$7" \) + "$8" \) + "${9?}" \
+    + 8
+} &&
+
+spf_unpack_template() {
+  spf_template__host=`prj_sedarg1 's/:.*$//'    "$1"` &&
+  spf_template__base=`prj_sedarg1 's/^[^:]*://' "$1"` &&
+  set x ${SP_TARDIR_FLAT+"${SP_TARDIR_FLAT?}/"} \
+    ${SP_TARDIR+"${SP_TARDIR?}/host/${spf_template__host?}/foreign/"} \
+    "$SP_ROOT/usr/local/src/package/host/${spf_template__host?}/foreign/" &&
+  shift &&
+  set x "$1".spf-templates && shift &&
+  { test -f "${sp_path?}/package/foreign_template_${spf_template__host?}:${spf_template__base?}" ||
+    cp "$1/${spf_template__base?}".sh "${sp_path?}/package/foreign_template_${spf_template__host?}:${spf_template__base?}"
+  }
+} &&
+
+spf_unpack_templates() {
+  while test "$#" != 0; do
+    { spf_unpack_template "$1" &&
+      shift
+    } || exit "$?"
+  done
+} &&
+
+prj_unset spf_tmpdir_ &&
+for sp_path in ${1+"$@"}; do
+  { sp_path=`prj_sedarg1 's%/*$%%' "${sp_path?}"` &&
+    case ${sp_path?} in
+      /*) :;;
+      *) prj_fail "package path must be absolute: ${sp_path?}";;
+    esac &&
+    spf_parse "${sp_path?}" &&
+    if test '' = "${spf_version}"
+      then prj_fail "package path must include a version: ${sp_path?}"
+      else :
+    fi &&
+    if test n = "${SP_REUNPACK?}" && test -d "${spf_path_compile?}"/src
+      then continue
+      else :
+    fi &&
+    spf_load_info &&
+    SPF_OFFLINE_SCRIPTS=y spf-download "${sp_path?}" &&
+    sp_mkdir &&
+    spf_cc compile_user '' 'The account on the first line of this file is used to compile the package.' &&
+    spf_cc package_home "${sp_path?}" \
+"The first line of this file specifies the directory where the package's files
+are found at run time.
+
+The directory must be specified as an absolute path.  Only the first line of
+this file is examined, so paths containing newlines cannot be used.
+
+Normally, this is the same as the build directory.  If you specify a
+different directory, then after building the package and before using it, you
+must move the contents of the build directory to this location, make a
+symlink, shuffle mount points, or otherwise ensure that this name refers to
+the package's build directory; otherwise, the package may not operate
+properly." &&
+    eval "spf_make_cc_files ${spf_cclist?}" &&
+    prj_mkdir_p "${spf_path_compile?}"/tmp/src &&
+    prj_mkdir_p "${spf_path_compile?}"/unpack-tmp &&
+    { test -d "${sp_path?}"/package || mkdir "${sp_path?}"/package; } &&
+    if prj_is_set SP_COMPILE_USER
+      then chown -R "${sp_id?}" "${sp_path?}"/.
+      else :
+    fi &&
+    eval "spf_process_urls_ ${spf_url_srcs_?}" &&
+    ( cd "${package_home?}" &&
+      exec tar -cf "${spf_path_compile?}"/tmp/tar \
+        package/INSTALL package/build package/install \
+        package/install_commands package/run package/upgrade \
+        package/upgrade_version
+    ) &&
+    ( cd "${package_home?}"/per-package &&
+      exec tar -rf "${spf_path_compile?}"/tmp/tar *
+    ) &&
+    ( cd "${sp_path?}" &&
+      exec tar -xf "${spf_path_compile?}"/tmp/tar ) &&
+    prj_echo "${spf_version?}" > "${sp_path?}"/package/versions &&
+    { test -f "${spf_path_snippet?}" ||
+      cp "${spf_info?}" "${spf_path_snippet?}"; } &&
+    eval "spf_unpack_templates ${spf_template__list?}" &&
+    { chown -R "${spf_caller_id_?}" "${sp_path?}"/. > /dev/null 2>&1 || :; } &&
+    rm -rf "${spf_path_compile?}"/unpack-tmp &&
+    mv "${spf_path_compile?}"/tmp/src "${spf_path_compile?}"/
+  } || exit "$?"
+done &&
+if prj_is_set spf_tmpdir_
+  then exec rm -rf "${spf_tmpdir_?}"
+  else :
+fi

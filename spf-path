@@ -1,0 +1,37 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+case $# in
+  0|1|2|3) prj_fail 'usage: spf-path variable subpath skips program [arg...]';;
+  *) :;;
+esac &&
+prj_u2 prj_set prj_program spf-path &&
+sp_validate_root &&
+
+prj_u2 prj_set var     "$1" && shift &&
+prj_u2 prj_set subpath "$1" && shift &&
+prj_u2 prj_set skips   "$1" && shift &&
+
+prj_unset x &&
+sp_process_package_current() {
+  x=${sp_path?}/${subpath?} &&
+  if eval 'prj_anyeq "${sp_path?}" '"${skips?}"; then :
+  elif prj_exists "${x?}"; then prj_append "${var?}" "${x?}"
+  else :
+  fi
+} &&
+
+if prj_match '/*' "$SP_ROOT" && test -d "$SP_ROOT"/package
+  then sp_for_each_package "${SP_ROOT?}"/package
+  else :
+fi &&
+sp_for_each_package /package &&
+
+export "${var?}" &&
+exec ${1+"$@"}

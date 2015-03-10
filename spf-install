@@ -1,0 +1,505 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./spftools.sh
+. ./sptools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+if test "$#" = 0
+  then prj_fail 'usage: spf-install /package/host/example.org/foreign/foo[-1.2.3[+spf4]] [...]'
+  else :
+fi &&
+prj_set prj_program spf-install &&
+sp_validate_root &&
+
+prj_set_default SP_KEEP_COMPILE     n &&
+prj_set_default SP_COMPAT           y &&
+prj_set_default SP_SKIP_TEST        n &&
+prj_set_default SP_IGNORE_TEST_FAIL n &&
+prj_set_default SP_DEREF_VERSION    y &&
+prj_set_default SP_UPGRADE_DEPS     y &&
+prj_set_default SP_REINSTALL        n &&
+prj_unset spf_uid spf_gid &&
+spf_uid=`prj_id -u` &&
+if test 0 = "${spf_uid?}"
+  then prj_set_default SP_DO_OWN y
+  else prj_set_default SP_DO_OWN n
+fi &&
+
+spf_hook() {
+  prj_x2 prj_set SPF_HOST    "${spf_host?}" &&
+  prj_x2 prj_set SPF_BASE    "${spf_base?}" &&
+  prj_x2 prj_set SPF_BTAG    "${spf_btag?}" &&
+  prj_x2 prj_set SPF_VERSION "${spf_version?}" &&
+  prj_x2 prj_set SPF_VTAG    "${spf_vtag?}" &&
+  sp_hook ${1+"$@"}
+} &&
+
+prj_unset spf_ccedit_line spf_ccedit_dep_path spf_ccedit_dep_target &&
+spf_ccedit() {
+  set "${spf_path_cc?}"/"$1" "${spf_path_cc?}"/defaults/"$1" "${2?}" &&
+  if test -f "$1"; then :; else
+    spf_ccedit_line=`sed q < "$2"` &&
+    if test "$3" = "${spf_ccedit_line?}"; then :; else
+      { prj_echo "$3" && sed 1d < "$2"; } > "$1{new}" &&
+      mv -f "$1{new}" "$1"
+    fi
+  fi
+} &&
+spf_ccedit_deps() {
+  for spf_ccvar in ${1+"$@"}; do
+    { eval "set x ${spf_ccvar?}" && shift &&
+      case $1 in
+        depend_*) :;;
+        *) continue;;
+      esac &&
+      spf_ccedit_dep_path=$2 &&
+      if prj_exists "$SP_ROOT$2"
+        then spf_ccedit_dep_path=$SP_ROOT$2
+        else :
+      fi &&
+      if test y = "${SP_DEREF_VERSION?}" &&
+         eval "spf_ccedit_dep_version_sensitive \"\$2\" ${spf_depend_list?}"
+      then
+        while test -h "${spf_ccedit_dep_path?}"; do
+          { spf_ccedit_dep_target=`
+              prj_basename "${spf_ccedit_dep_path?}"` &&
+            case $spf_ccedit_dep_target in
+              *"${sp_dashdigit?}"*) break;;
+              *) :;;
+            esac &&
+            spf_ccedit_dep_target=`readlink "${spf_ccedit_dep_path?}"` &&
+            case $spf_ccedit_dep_target in
+              /*) :;;
+              *) spf_ccedit_dep_target=`
+                   prj_dirname "${spf_ccedit_dep_path?}"
+                   `${spf_ccedit_dep_target?};;
+            esac &&
+            spf_ccedit_dep_path=${spf_ccedit_dep_target?}
+          } || return "$?"
+        done
+      else :
+      fi &&
+      spf_ccedit "$1" "${spf_ccedit_dep_path?}"
+    } || return "$?"
+  done
+} &&
+prj_unset spf_ccedit_dep_version_path &&
+spf_ccedit_dep_version_sensitive() {
+  spf_ccedit_dep_version_path=$1 && shift &&
+  for spf_depend_tmp in ${1+"$@"}; do
+    { eval "set x ${spf_depend_tmp?}" && shift &&
+      if test x"$2" = x"${spf_ccedit_dep_version_path?}"; then
+        test yes = "$7"
+        return "$?"
+      else :
+      fi &&
+      shift
+    } || return "$?"
+  done &&
+  return 100
+} &&
+
+spf_as_compile_user() {
+  if prj_is_set SP_COMPILE_USER
+    then setuidgid "${SP_COMPILE_USER?}" "$@"
+    else "$@"
+  fi
+} &&
+
+prj_unset spf_install_dep spf_install_deps spf_install_vpat &&
+spf_install_set_deps() {
+  spf_install_deps='' &&
+  if test n = "${SP_UPGRADE_DEPS?}"
+    then return 0 #### should still check dependency versions 
+    else :
+  fi &&
+  spf_load_info external &&
+  eval "set x ${spf_depend_list?}" && shift &&
+  for spf_install_dep in ${1+"$@"}; do {
+    eval "set x ${spf_install_dep?}" && shift &&
+    spf_parse "$2" &&
+    spf_load_info external &&
+    spf_install_vpat=$5 &&
+    eval "set x ${spf_tested_versions?}" && shift &&
+    while test "$#" != 0; do {
+      if prj_match "${spf_install_vpat?}" "$1" &&
+         eval 'prj_not prj_anyeq "${sp_dir?}${spf_base?}-$1" '"${spf_install_bad_versions?}"
+        then break
+        else shift
+      fi
+    } || return "$?"; done &&
+    if test "$#" = 0; then
+      prj_fail "no version of ${sp_dir?}${sp_base?} satisfies all criteria"
+    else :
+    fi &&
+    prj_qlist_push spf_install_deps "${sp_dir?}${sp_base?}-$1"
+  } || return "$?"; done
+} &&
+
+prj_unset spf_install_deps_all_done &&
+spf_install_deps_done() {
+  spf_install_deps_all_done=y &&
+  if test n = "${SP_UPGRADE_DEPS?}"
+    then return 0
+    else :
+  fi &&
+  spf_load_info external &&
+  eval "set x ${spf_depend_list?}" && shift &&
+  for spf_install_dep in ${1+"$@"}; do {
+    eval "set x ${spf_install_dep?}" && shift &&
+    spf_parse "$2" &&
+    if eval 'prj_anyeq "${sp_dir?}${spf_base?}" '"${spf_install_pkgs}"
+      then :
+      else spf_install_deps_all_done=n && break
+    fi
+  } || return "$?"; done
+} &&
+
+prj_unset spf_install_pkg spf_install_pkgs spf_install_versions \
+  spf_install_bad_versions spf_install_conflict_version &&
+spf_install_set_pkgs() {
+  spf_install_bad_versions='' &&
+  spf_parse "${spf_install_pkg?}" &&
+  spf_load_info external &&
+  spf_set_version &&
+  set x "${sp_path?}" && shift &&
+  spf_install_pkgs='' &&
+  spf_install_versions='' &&
+  while test "$#" != 0; do {
+    spf_parse "$1" &&
+    if eval 'prj_anyeq "${sp_path?}" '"${spf_install_versions?}"; then :
+    elif eval 'prj_anyeq "${sp_dir?}${spf_base?}" '"${spf_install_pkgs?}"; then
+      eval "set x ${spf_install_versions?}" && shift &&
+      for spf_install_conflict_version in ${1+"$@"}; do {
+        case ${spf_install_conflict_version?} in
+          "${sp_dir?}${spf_base?}"-[0123456789]*) break;;
+          *) :;;
+        esac
+      } || return "$?"; done &&
+      spf_load_info external &&
+      eval "set x ${spf_tested_versions?}" && shift &&
+      while test "$#" != 0; do {
+        case ${sp_dir?}${spf_base?}-$1 in
+          "${spf_install_conflict_version?}")
+            prj_qlist_push spf_install_bad_versions \
+              "${spf_install_conflict_version?}" &&
+            break;;
+          "${sp_path?}")
+            prj_qlist_push spf_install_bad_versions "${sp_path?}" &&
+            break;;
+          *) shift;;
+        esac
+      } || return "$?"; done &&
+      spf_parse "${spf_install_pkg?}" &&
+      spf_load_info external &&
+      spf_set_version &&
+      set x "${sp_path?}" && shift &&
+      spf_install_pkgs='' &&
+      spf_install_versions='' &&
+      set dummy ${1+"$@"}
+    else
+      prj_qlist_unshift spf_install_pkgs     "${sp_dir?}${spf_base?}" &&
+      prj_qlist_unshift spf_install_versions "${sp_path?}" &&
+      spf_install_set_deps &&
+      eval 'set x ${1+"$@"} '"${spf_install_deps?}" && shift
+    fi &&
+    shift
+  } || return "$?"; done &&
+  eval "set x ${spf_install_versions?}" && shift &&
+  spf_install_pkgs='' &&
+  spf_install_versions='' &&
+  while test "$#" != 0; do {
+    spf_parse "$1" &&
+    spf_install_deps_done &&
+    if test y = "${spf_install_deps_all_done?}"; then
+      spf_parse "$1" &&
+      prj_qlist_push spf_install_pkgs     "${sp_dir?}${spf_base?}" &&
+      prj_qlist_push spf_install_versions "${sp_path?}"
+    else
+      set x ${1+"$@"} "$1" && shift
+    fi &&
+    shift
+  } || return "$?"; done
+} &&
+
+spf_install_parse_vtag() {
+  spf_parse "$1" &&
+  prj_sedarg1 's:^+spf+::' "${spf_vtag?}"
+} &&
+
+prj_unset spf_install_dep_base spf_install_dep_version_ok &&
+spf_install_check_dep_version() {
+  if test "$6" = compiletime; then
+    spf_install_dep_version_ok=y
+  else
+    spf_install_dep_base=`prj_basename "$2"` &&
+    if test -d "$SP_ROOT$2"/.
+      then set x "$SP_ROOT$2" && shift
+      else set x         "$2" && shift
+    fi &&
+    if prj_dir_eq "${spf_install_pkg?}/conf/${spf_install_dep_base?}" "$1"
+      then spf_install_dep_version_ok=y
+      else spf_install_dep_version_ok=n
+    fi
+  fi
+} &&
+
+prj_unset spf_install_toolchain_dir spf_install_toolchain_dep &&
+spf_install_add_toolchain_deps() {
+  spf_load_info external &&
+  spf_install_toolchain_dir=`gcc -v 2>&1` &&
+  prj_capture spf_install_toolchain_dir prj_sedarg '
+/^Configured with: /!d
+s:^.* --prefix=::
+s:\(/gcc-[0-9][^/]*/prefix\) --.*$:\1:
+s:/gcc-[0-9][^/]*/prefix$:/:
+' "${spf_install_toolchain_dir?}" &&
+  for spf_install_toolchain_dep in "${SPF_LIBC-glibc?}" gcc; do {
+    if test -d \
+        "${spf_install_pkg?}"/conf/"${spf_install_toolchain_dep?}"/.; then
+      case ${spf_install_toolchain_dir?} in
+        /package/host/*/foreign/|"$SP_ROOT"/package/host/*/foreign/)
+          spf_depend \
+            "${spf_install_toolchain_dir?}${spf_install_toolchain_dep?}";;
+        *) prj_fail 'unable to find the gcc installation directory';;
+      esac
+    else :
+    fi
+  } || return "$?"; done
+} &&
+
+prj_unset spf_install_version_ok spf_install_cur_ver spf_install_dir &&
+spf_install_check_version() {
+  spf_install_version_ok=n &&
+  if test -d "$SP_ROOT/package/${sp_category?}${spf_base?}"/.
+    then spf_install_dir=$SP_ROOT
+    else spf_install_dir=''
+  fi &&
+  set x "${spf_install_dir?}${sp_relpath?}"+spf+[*]/prefix/.built \
+        "${spf_install_dir?}${sp_relpath?}"+spf+*/prefix/.built && shift &&
+  if test x"$1" = x"${spf_install_dir?}${sp_relpath?}+spf+[*]/prefix/.built" &&
+     test x"$2" = x"${spf_install_dir?}${sp_relpath?}+spf+*/prefix/.built"
+    then shift
+    else :
+  fi && shift &&
+  spf_install_dir=${spf_install_dir?}/package/${sp_category?} &&
+  if test -d "${spf_install_dir?}${spf_base?}"/.; then
+    spf_install_cur_ver=${spf_install_dir?}${spf_base?}/package/versions &&
+    if test -f "${spf_install_cur_ver?}"; then
+      spf_install_cur_ver=`sed '$!d' "${spf_install_cur_ver?}"` &&
+      if test x"${spf_install_cur_ver?}" = x"${spf_version?}"; then
+        set x "${spf_install_dir?}${spf_base?}"/prefix/.built ${1+"$@"} &&
+        shift
+      else :
+      fi
+    else :
+    fi
+  else :
+  fi &&
+  if test "$#" = 0
+    then return 0
+    else :
+  fi &&
+  prj_unset spf_install_vtag &&
+  for spf_install_pkg in ${1+"$@"}; do {
+    spf_install_pkg=`prj_sedarg1 's:/prefix/\.built$::' "${spf_install_pkg?}"` &&
+    spf_install_add_toolchain_deps &&
+    eval "set x ${spf_depend_list?}" && shift &&
+    while test "$#" != 0; do {
+      eval "spf_install_check_dep_version $1"
+      if test y = "${spf_install_dep_version_ok?}"
+        then shift
+        else break
+      fi
+    } || return "$?"; done &&
+    if test "$#" != 0
+      then continue
+      else :
+    fi &&
+    if test x"${spf_install_pkg?}" = x"${spf_install_dir?}${spf_base?}"
+      then spf_install_vtag='' && break
+      else :
+    fi &&
+    spf_install_pkg=`spf_install_parse_vtag "${spf_install_pkg?}"` &&
+    if prj_not prj_is_set spf_install_vtag ||
+       expr \( "${spf_install_pkg?}" \> "${spf_install_vtag?}" \) > /dev/null
+      then spf_install_vtag=${spf_install_pkg?}
+      else :
+    fi
+  } || return "$?"; done &&
+  if prj_is_set spf_install_vtag; then
+    if test '' != "${spf_install_vtag?}"
+      then sp-version "${spf_install_dir?}${spf_base?}-${spf_version?}+spf+${spf_install_vtag?}"
+      else :
+    fi &&
+    spf_install_version_ok=y
+  else :
+  fi
+} &&
+
+spf_install_ensure_version() {
+  spf_parse "$1" &&
+
+  if test '' = "${spf_vtag?}"; then
+    spf_install_check_version &&
+    if test y = "${spf_install_version_ok?}" &&
+       test n = "${SP_REINSTALL?}"
+      then return 0
+      else spf_set_vtag
+    fi
+  elif test -f "${spf_path_built?}"; then
+    spf_install_pkg=${sp_path?} &&
+    spf_install_add_toolchain_deps &&
+    eval "set x ${spf_depend_list?}" && shift &&
+    while test "$#" != 0; do {
+      if eval "spf_install_check_dep_version $1"
+        then shift
+        else break
+      fi
+    } || return "$?"; done &&
+    if test "$#" != 0; then
+      prj_fail "dependencies are not up to date for ${sp_path?}"
+    elif test n = "${SP_REINSTALL?}"; then
+      return 0
+    else :
+    fi
+  else :
+  fi &&
+
+  spf_load_info external &&
+
+  if eval 'prj_anyeq "${spf_version?}" '"${spf_tested_versions?}"
+    then :
+    else prj_warn "${sp_path?}: this version has not been tested"
+  fi &&
+
+  if test dep = "${spf_install_src?}"
+    then spf_parse "$SP_ROOT${sp_path?}"
+    else :
+  fi &&
+
+  spf_hook BEFORE_UNPACK &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+  rm -rf "${spf_path_compile?}" &&
+  SPF_OFFLINE_SCRIPTS=y spf-unpack "${sp_path?}" &&
+  spf_hook AFTER_UNPACK &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+
+  rm -f "${spf_path_cc?}"/package_home &&
+  spf_ccedit package_home "${sp_path?}" &&
+  if prj_is_set SP_COMPILE_USER
+    then spf_ccedit compile_user "${SP_COMPILE_USER?}"
+    else :
+  fi &&
+  eval "spf_ccedit_deps ${spf_cclist?}" &&
+  spf_hook AFTER_CONFIGURE &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+
+  if test '' = "${spf_data_list?}" ||
+     test -d "${sp_dir?}/${spf_base?}"-data/.; then :; else
+    prj_mkdir_p "${sp_dir?}/${spf_base?}"-data-0 &&
+    sp-version "${sp_dir?}/${spf_base?}"-data-0
+  fi &&
+
+  if prj_is_set SP_COMPILE_USER; then
+    spf_uid=`prj_id -u "${SP_COMPILE_USER?}"` &&
+    chown -R "${spf_uid?}" "${sp_path?}"/. &&
+    if test '' = "${spf_data_list?}"
+      then :
+      else chown -R "${spf_uid?}" "${sp_dir?}/${spf_base?}"-data/.
+    fi &&
+    ( cd "${sp_path?}" &&
+      spf_as_compile_user package/compile ) &&
+    spf_uid=`prj_id -u` &&
+    spf_gid=`prj_id -g` &&
+    chown -R "${spf_uid?}:${spf_gid?}" "${sp_path?}"/. &&
+    if test '' = "${spf_data_list?}"
+      then :
+      else chown -R "${spf_uid?}:${spf_gid?}" "${sp_dir?}/${spf_base?}"-data/.
+    fi
+  else
+    ( cd "${sp_path?}" && exec package/compile )
+  fi &&
+  spf_hook AFTER_COMPILE &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+
+  if test n = "${SP_DO_OWN?}"; then :; else
+    ( cd "${sp_path?}" && exec package/own ) &&
+    spf_hook AFTER_OWN &&
+    { test "${sp_hook_status?}" != 99 || return 0; }
+  fi &&
+
+  if test y = "${SP_SKIP_TEST?}"; then :; else
+    if prj_is_set SP_COMPILE_USER; then
+      spf_uid=`prj_id -u "${SP_COMPILE_USER?}"` &&
+      chown -R "${spf_uid?}" "${spf_path_compile?}"/.
+    else :
+    fi &&
+    if test n = "${SP_IGNORE_TEST_FAIL?}"; then
+      ( cd "${sp_path?}" && spf_as_compile_user package/check )
+    else
+      ( cd "${sp_path?}" && spf_as_compile_user package/check ) ||
+      { prj_warn "tests failed for ${sp_path?}" &&
+        if test skip = "${SP_IGNORE_TEST_FAIL?}"; then return 0; else :; fi
+      }
+    fi &&
+    if prj_is_set SP_COMPILE_USER; then
+      spf_uid=`prj_id -u` &&
+      spf_gid=`prj_id -g` &&
+      chown -R "${spf_uid?}:${spf_gid?}" "${spf_path_compile?}"/.
+    else :
+    fi
+  fi &&
+  spf_hook AFTER_CHECK &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+
+  if test n = "${SP_KEEP_COMPILE?}"
+    then rm -rf "${spf_path_compile?}"
+    else :
+  fi &&
+  spf_hook AFTER_CLEAN &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+
+  sp-version "${sp_path?}" &&
+  spf_hook AFTER_VERSION &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+
+  #### spf_base 
+  if test -d "${sp_dir?}${sp_base?}"/command/.; then
+    ( prj_x2 prj_set_default SP_REPLACE_LINKS n &&
+      set "$SP_ROOT"/command &&
+      if test y = "${SP_COMPAT?}"
+        then set "$@" "$SP_ROOT"/usr/local/bin
+        else :
+      fi &&
+      exec sp-links "${sp_dir?}${sp_base?}"/command "$@" )
+  else :
+  fi &&
+  spf_hook AFTER_LINKS &&
+  { test "${sp_hook_status?}" != 99 || return 0; } &&
+
+  : #### spf_hook AFTER_RUN 
+
+} &&
+
+prj_unset spf_install_src &&
+for spf_install_pkg in ${1+"$@"}; do {
+  spf_install_pkg=`prj_sedarg1 's:/*$::' "${spf_install_pkg?}"` &&
+  case ${spf_install_pkg?} in
+    /*) :;;
+    *) prj_fail "package path must be absolute: ${spf_install_pkg?}";;
+  esac &&
+  spf_install_set_pkgs &&
+  eval "set x ${spf_install_versions?}" && shift &&
+  while test "$#" != 0; do {
+    if test "$#" = 1
+      then spf_install_src=arg
+      else spf_install_src=dep
+    fi &&
+    spf_install_ensure_version "$1" &&
+    shift
+  } || exit "$?"; done
+} || exit "$?"; done
