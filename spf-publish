@@ -63,30 +63,6 @@ spf_make_tarball_() {
   mv ${spf_tmpdir_?}/${spf_tar_base?}.tar.xz ${spf_dist_dir?}/${current_arch?}
 } &&
 
-spf_process_url_() {
-  spf_url_=$1 &&
-  spf_tar_base=`prj_basename "${spf_url_?}"` &&
-  sp_find_tar &&
-  { test not_found = "${sp_tar?}" || return 0; } &&
-  if prj_is_set SP_TARDIR_FLAT; then
-    spf_tardir_=${SP_TARDIR_FLAT?} && spf_tmp_=/
-  elif prj_is_set SP_TARDIR; then
-    spf_tardir_=${SP_TARDIR?} && spf_tmp_=/${sp_category?}
-  else
-    spf_tardir_=$SP_ROOT/usr/local/src/package &&
-    spf_tmp_=/${sp_category?}
-  fi &&
-  { test -d "${spf_tardir_?}"/. ||
-    prj_fail "no such directory: ${spf_tardir_?}"; } &&
-  spf_tardir_=${spf_tardir_?}${spf_tmp_?} &&
-  prj_mkdir_p "${spf_tardir_?}" &&
-  { prj_is_set spf_tmpdir_ ||
-    prj_tmpdir spf_tmpdir_ "${spf_tardir_?}"; } &&
-  { prj_download "${spf_url_?}" "${spf_tmpdir_?}" "${spf_tar_base?}" ||
-    prj_savestatus rm -rf "${spf_tmpdir_?}"; } &&
-  mv -f "${spf_tmpdir_?}/${spf_tar_base?}" "${spf_tardir_?}"
-} &&
-
 prj_unset spf_url_ spf_tmp_ spf_tardir_ spf_tmpdir_ &&
 for sp_path in ${1+"$@"}; do
   { sp_path=`prj_sedarg1 's%/*$%%' "${sp_path?}"` &&
