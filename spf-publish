@@ -13,14 +13,59 @@ case $? in 0) :;; *) (exit "$?");; esac &&
 prj_set prj_program spf-publish &&
 sp_validate_root &&
 
-spf_make_package_() {
-  spf_url_=$1 &&
-  is_static=`spf_is_static "${spf_url_?}"`
-  if test $? = 0 ; then echo "static" ;  else echo "dynamic" ; fi 
+# 
+spf_make_packages_() {
+  # find the dependencies if dynamic - and push it onto this function again for each
+  #   - should be done outside this function
+  spf_url=$1 &&
+  prj_u2 prj_getstatus is_static \
+    spf_is_static "${spf_url?}" &&
+  if test 0 = "${is_static}"; then 
+    echo "static" ;
+    # make a tarball
+    # need the symlinked depends
+    #tar Jcpf /tmp/${spf_tar_base?}.tar.xz ${spf_url?}
+  else 
+    echo "dynamic" ;
+    # can't use --dereference (h) since compilation specs point to absolute path for musl
+    # tar Jcpf /tmp/${spf_tar_base?}.tar.xz ${spf_url?}
+    # take conf-compile/* | head -n1 | full name
+    # $package_name-depends.txt
+  fi
+
 } &&
+spf_make_tarball_() {
+  # spf_url=/package/host/test.com/foreign/wget-1.16.3+spf+1
+  # spf_base=wget - is set from the spf_parse function
+  # spf_path_data=wget-data - is set from the spf_parse function
+  spf_url_=$1 &&
+  spf_tar_base=`prj_basename "${spf_url_?}"` &&
+  current_arch=$(arch) &&
+  spf_dist_dir=$SP_ROOT/package/host/${spf_host?}/dist/ &&
+  prj_mkdir_p ${spf_dist_dir?}/${current_arch?} &&
+  prj_mkdir_p ${spf_dist_dir?}/tmp &&
+  prj_u2 prj_getstatus is_static \
+    spf_is_static "${spf_url_?}" &&
+  { prj_is_set spf_tmpdir_ ||
+    prj_tmpdir spf_tmpdir_ "${spf_dist_dir?}/tmp"; } &&
+  # copy the package file to tmpdir
+  cp -Rp ${spf_url_?} ${spf_tmpdir_?} &&
+  # copy the data dir and rename it to the correct tag
+  spf_foreign_dir_=$(prj_dirname $spf_url_) &&
+  spf_data_dir_=$(readlink ${spf_foreign_dir_}/${spf_base?}-data) &&
+  cp -Rp ${spf_foreign_dir_?}/${spf_data_dir_?} ${spf_tmpdir_?}/${spf_tar_base}-data &&
+  cd ${spf_tmpdir_?} &&
+  # run a strip --strip-unneeded on the binaries
+  for file in */command/* ; do 
+      strip --strip-unneeded $file
+  done &&
+  tar Jcpf ${spf_tar_base?}.tar.xz ./* &&
+  mv ${spf_tmpdir_?}/${spf_tar_base?}.tar.xz ${spf_dist_dir?}/${current_arch?}
+} &&
+
 spf_process_url_() {
   spf_url_=$1 &&
-  sp_tar_base=`prj_basename "${spf_url_?}"` &&
+  spf_tar_base=`prj_basename "${spf_url_?}"` &&
   sp_find_tar &&
   { test not_found = "${sp_tar?}" || return 0; } &&
   if prj_is_set SP_TARDIR_FLAT; then
@@ -37,9 +82,9 @@ spf_process_url_() {
   prj_mkdir_p "${spf_tardir_?}" &&
   { prj_is_set spf_tmpdir_ ||
     prj_tmpdir spf_tmpdir_ "${spf_tardir_?}"; } &&
-  { prj_download "${spf_url_?}" "${spf_tmpdir_?}" "${sp_tar_base?}" ||
+  { prj_download "${spf_url_?}" "${spf_tmpdir_?}" "${spf_tar_base?}" ||
     prj_savestatus rm -rf "${spf_tmpdir_?}"; } &&
-  mv -f "${spf_tmpdir_?}/${sp_tar_base?}" "${spf_tardir_?}"
+  mv -f "${spf_tmpdir_?}/${spf_tar_base?}" "${spf_tardir_?}"
 } &&
 
 prj_unset spf_url_ spf_tmp_ spf_tardir_ spf_tmpdir_ &&
@@ -54,11 +99,15 @@ for sp_path in ${1+"$@"}; do
       then prj_fail "package path must include a version: ${sp_path?}"
       else :
     fi &&
+    if test -d "${sp_path?}" 
+      then :
+      else prj_fail "package path must be a directory: ${sp_path?}"
+    fi &&
     spf_load_info &&
     eval "set x ${sp_path?}" && shift &&
 #    eval "set x ${spf_url_home_?}" && shift &&
     while test "$#" != 0; do
-      { eval "spf_make_package_ $1" &&
+      { eval "spf_make_tarball_ $1" &&
         shift
       } || exit "$?"
     done
