@@ -17,7 +17,7 @@ spf_make_depends_file_() {
   spf_url_=$1 &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
-  spf_depends_file_=${spf_dist_dir_?}/$(arch)/${spf_tar_base?}.depends.txt &&
+  spf_depends_file_=${spf_dist_dir_?}/$(uname -m)/${spf_tar_base?}.depends.txt &&
   rm -f ${spf_depends_file_} &&
   prj_u2 prj_getstatus is_static \
     spf_is_static "${spf_url_?}" &&
@@ -58,7 +58,7 @@ spf_make_tarball_() {
   spf_url_=$1 &&
   echo "Making tarball for ${spf_url_}" &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
-  current_arch=$(arch) &&
+  current_arch=$(uname -m) &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
   if prj_exists ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.xz; then
     echo "Package ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.xz already exists"
