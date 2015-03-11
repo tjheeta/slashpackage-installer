@@ -1,0 +1,4 @@
+#!/bin/sh
+package/build &&
+package/upgrade &&
+exec package/run

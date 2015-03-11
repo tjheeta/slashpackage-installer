@@ -1,0 +1,7 @@
+command:syst
+compile:syst
+conf-compile:dist
+package:dist
+per-package:dist
+sh:dist
+src:dist

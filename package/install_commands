@@ -1,0 +1,91 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_dirname() {
+  sed '
+1h
+1!H
+$!d
+g
+s%[^/]*$%%
+' <<EOT
+${1?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_basename() {
+  sed '
+1h
+1!H
+g
+s%^.*/%%
+h
+$!d
+' <<EOT
+${1?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_sedarg1() {
+  sed -e '
+1h
+1!H
+$!d
+g
+'"$1" <<EOT
+${2?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_fail() {
+  : "${1?}" &&
+  set x "$*" &&
+  if test "${prj_program+x}" = x
+    then set x "${prj_program?}: $2"
+    else :
+  fi &&
+  case $2 in
+    -*|*\\*) cat <<EOT
+$2
+EOT
+      ;;
+    *) echo "$2";;
+  esac >&2
+  return 100
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+{ test -d command/. || exit 0; } &&
+echo 'Making command links in /command and /usr/local/bin' &&
+prj_package= && home= && tmp= && command= &&
+unset prj_package home tmp command &&
+prj_package=package/upgrade_version &&
+tmp=conf-compile/package_home &&
+{ test -f "${tmp?}" || tmp=conf-compile/defaults/package_home; } &&
+home=`sed q < "${tmp?}"` &&
+case ${home?} in
+  /*[!/]*) :;;
+  *) prj_fail "${tmp?} must specify an absolute path other than /.";;
+esac &&
+home=`prj_sedarg1 's%/*$%%' "${home?}"` &&
+tmp=` prj_dirname  "${home?}"` &&
+home=`prj_basename "${home?}"` &&
+home=${tmp?}`prj_sedarg1 's%-[0123456789].*$%%' "${home?}"` &&
+
+cd command &&
+for tmp in /command /usr/local/bin; do
+  { { test -d "${tmp?}"/. || mkdir "${tmp?}"; } &&
+    for command in *; do
+      { { test -f "${command?}" || continue; } &&
+        rm -f "${tmp?}/${command?}{new}" &&
+        ln -s "${home?}/command/${command?}" "${tmp?}/${command?}{new}" &&
+        mv -f "${tmp?}/${command?}{new}" "${tmp?}/${command?}"
+      } || exit "$?"
+    done
+  } || exit "$?"
+done

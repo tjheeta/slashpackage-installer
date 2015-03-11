@@ -1,0 +1,647 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_not() {
+  if test "$#" = 0 || "$@"
+    then return 100
+    else return 0
+  fi
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_is_set() {
+  eval "test \"\${${1?}+x}\" = x"
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_set() {
+  eval "$1=\${2?}"
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_set_default() {
+  : "${2?}" &&
+  eval "
+  if test \"\${$1+x}\" = x; then :; else
+    $1=\$2
+  fi"
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_unset() {
+  while test "$#" != 0; do
+    { eval "$1=" &&
+      unset "$1" &&
+      shift
+    } || return "$?"
+  done
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_x2() {
+  : "${2?}" &&
+  "$@" &&
+  export "$2"
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_u2() {
+  : "${2?}" &&
+  "$@" &&
+  eval "
+  set x \"\$$2\" &&
+  $2= &&
+  unset $2 &&
+  $2=\$2"
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_match() {
+  eval "
+  case \${2?} in
+    $1) :;;
+    *) return 100;;
+  esac"
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_echo() {
+  case $* in
+    -*|*\\*)
+      # Avoid echo's nonportable behavior for switches and escapes.
+      cat <<EOT
+$*
+EOT
+      ;;
+    *)
+      # Use echo when we can get away with it, since it's typically a builtin.
+      echo "$*";;
+  esac
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_fail() {
+  : "${1?}" &&
+  set x "$*" &&
+  if test "${prj_program+x}" = x
+    then set x "${prj_program?}: $2"
+    else :
+  fi &&
+  case $2 in
+    -*|*\\*) cat <<EOT
+$2
+EOT
+      ;;
+    *) echo "$2";;
+  esac >&2
+  return 100
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_capture() {
+  eval "
+  shift &&
+  ${1?}"'=`${1+"$@"}`'
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_sedarg1() {
+  sed -e '
+1h
+1!H
+$!d
+g
+'"$1" <<EOT
+${2?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_dirname() {
+  sed '
+1h
+1!H
+$!d
+g
+s%[^/]*$%%
+' <<EOT
+${1?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_basename() {
+  sed '
+1h
+1!H
+g
+s%^.*/%%
+h
+$!d
+' <<EOT
+${1?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_which_elt_= &&
+prj_which_rest_= &&
+unset prj_which_elt_ prj_which_rest_ &&
+prj_which_get_elt() {
+  sed '
+1h
+1!H
+$!d
+g
+s%:.*$%%
+/./s%$%/%
+' <<EOT
+${1?}
+EOT
+} &&
+prj_which_get_rest() {
+  sed '
+1h
+1!H
+$!d
+g
+s%^[^:]*:%%
+' <<EOT
+${1?}
+EOT
+} &&
+prj_which() {
+  : "${2?}" &&
+  prj_which_rest_= &&
+  if test "${3+x}" = x;  then prj_which_rest_=${prj_which_rest_?}$3:;    else :
+  fi &&
+  if test x"$PATH" != x; then prj_which_rest_=${prj_which_rest_?}$PATH:; else :
+  fi &&
+  if test "${4+x}" = x;  then prj_which_rest_=${prj_which_rest_?}$4:;    else :
+  fi &&
+  while test "${prj_which_rest_?}" != ''; do
+    { prj_which_elt_=`prj_which_get_elt "${prj_which_rest_?}"`$2 &&
+      if test -x "${prj_which_elt_?}" && test -f "${prj_which_elt_?}"; then
+        eval "$1=\${prj_which_elt_?}" &&
+        return 0
+      else :
+      fi &&
+      prj_which_rest_=`prj_which_get_rest "${prj_which_rest_?}"`
+    } || return "$?"
+  done &&
+  { echo "unable to find $2 in \$PATH" >&2
+    return 100
+  }
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+if (prj_which readlink_path readlink) 2> /dev/null; then
+  :
+elif (exec perl -e '') > /dev/null 2>&1; then
+  readlink() { perl -le 'print(readlink($ARGV[0]) or die($!."\n"))' "${1?}"; }
+elif (exec python -c '') > /dev/null 2>&1; then
+  readlink() {
+    python -c 'import sys, os; print os.readlink(sys.argv[1])' "${1?}"
+  }
+elif (exec guile -c '') > /dev/null 2>&1; then
+  readlink() {
+    guile -c '(format #t "~A\n" (readlink (cadr (program-arguments))))' "${1?}"
+  }
+else
+  readlink() {
+    echo "${prj_program-readlink}: unable to find a readlink program" >&2
+    return 100
+  }
+fi
+
+(exit "$?") &&
+prj_u2 prj_set prj_program package/compile &&
+
+mkmed_copy() {
+  : "${3?}" &&
+  rm -f compile/tmpdir/copy.tar &&
+  (cd "$1" && exec tar cf - "$2")    > compile/tmpdir/copy.tar &&
+  (cd compile/move && exec tar xf -) < compile/tmpdir/copy.tar &&
+  { test "$2" = "$3" ||
+    mv -f compile/move/"$2" compile/move/"$3"
+  }
+} &&
+
+echo Creating directories &&
+rm -rf compile/move compile/tmpdir compile/sum-move &&
+prj_unset dir &&
+for dir in \
+    command \
+    compile \
+    compile/conf \
+    compile/depsums \
+    compile/depsums/command \
+    compile/depsums/compile \
+    compile/depsums/compile/conf \
+    compile/depsums/compile/host \
+    compile/depsums/compile/host/prjlibs-sh \
+    compile/depsums/per-package \
+    compile/depsums/per-package/package \
+    compile/depsums/sh \
+    compile/host \
+    compile/host/prjlibs-sh \
+    compile/move \
+    compile/sum-move \
+    compile/sums \
+    compile/sums/compiled \
+    compile/sums/compiled/confd \
+    compile/sums/compiled/hostd \
+    compile/sums/compiled/hostd/prjlibs-shd \
+    compile/sums/conf-compiled \
+    compile/sums/conf-compiled/defaultsd \
+    compile/sums/srcd \
+    compile/sums/srcd/.mkmed-datad \
+    compile/sums/srcd/.mkmed-datad/srcd \
+    compile/sums/srcd/.mkmed-datad/srcd/prjlibs-shd \
+    compile/sums/srcd/.mkmed-datad/srcd/sptools-shd \
+    compile/tmpdir \
+    per-package \
+    per-package/package \
+    sh; do
+  test -d ./"${dir?}" || mkdir ./"${dir?}" || exit "$?"
+done &&
+
+TMPDIR=`pwd`/compile/tmpdir &&
+export TMPDIR &&
+prj_unset number input output directory basename package_home checksum \
+  checksum_list checksum_tmp failure_status &&
+
+package_home=conf-compile/package_home &&
+{ test -f "${package_home?}" ||
+  package_home=conf-compile/defaults/package_home; } &&
+package_home=`sed q < "${package_home?}"` &&
+case ${package_home?} in
+  /*) :;;
+  *) prj_fail 'conf-compile/package_home must specify an absolute path'
+esac &&
+prj_x2 prj_set_default SPF_CONF "${package_home?}"/conf &&
+
+checksum=conf-compile/checksum &&
+{ test -f "${checksum?}" || checksum=conf-compile/defaults/checksum; } &&
+checksum=`sed q "${checksum?}"` &&
+if test "${checksum?}" = ''; then
+  if   (exec sha1sum) < /dev/null > /dev/null 2>&1; then checksum=sha1sum
+  elif (exec sha1   ) < /dev/null > /dev/null 2>&1; then checksum=sha1
+  elif (exec md5sum ) < /dev/null > /dev/null 2>&1; then checksum=md5sum
+  elif (exec md5    ) < /dev/null > /dev/null 2>&1; then checksum=md5
+  elif (exec cksum  ) < /dev/null > /dev/null 2>&1; then checksum=cksum
+  else checksum=sum
+  fi
+else :
+fi &&
+checksum_ok() {
+  : "${4?}" &&
+  set x "$@" "$1" "$2" && shift && shift && shift &&
+  checksum_list= &&
+  while test "$#" != 2; do
+    { if prj_is_set checksum_of_"$1"; then :
+      elif test -f "$2"; then
+        checksum_tmp=`"${checksum?}" < "$2"` &&
+        prj_set checksum_of_"$1" "S${checksum_tmp?}"
+      elif test -h "$2"; then
+        checksum_tmp=`readlink "$2"` &&
+        prj_capture checksum_of_"$1" prj_sedarg1 's/%/%p/g
+s/S/%s/g
+s/L/%l/g
+s/X/%x/g
+s/^/L/' "${checksum_tmp?}"
+      else
+        prj_set checksum_of_"$1" X
+      fi &&
+      eval "checksum_list=\${checksum_list?}\${checksum_of_$1?}" &&
+      shift && shift
+    } || return "$?"
+  done &&
+  prj_echo "${checksum_list?}" > compile/sum-move/"$2" &&
+  { test -f "$1$2" || test -h "$1$2"; } &&
+  cmp compile/depsums/"$1$2" compile/sum-move/"$2" > /dev/null 2>&1
+} &&
+
+prj_unset \
+  status_1 \
+  status_2 \
+  status_3 \
+  status_4 \
+  status_5 \
+  status_6 \
+  status_7 \
+  status_8 \
+  status_9 \
+  status_10 \
+  status_11 \
+  status_12 &&
+
+make_() {
+  case ${1?} in
+    command/spf-download) number=1;;
+    command/spf-install) number=2;;
+    command/spf-path) number=3;;
+    command/spf-unpack) number=4;;
+    compile/conf/package_home) number=5;;
+    compile/host/prjlibs-sh/package_home.sh) number=6;;
+    compile/host/quote-conf-compile:package_home:sh) number=7;;
+    compile/host/spf-unpack) number=8;;
+    per-package/package/check) number=9;;
+    per-package/package/compile) number=10;;
+    per-package/package/own) number=11;;
+    sh/spftools.sh) number=12;;
+    *) prj_fail no rule to make file "$1";;
+  esac &&
+  if prj_is_set status_"${number?}"
+    then eval "return \"\${status_${number?}?}\""
+    else :
+  fi &&
+  set x "$1" "$directory" "$basename" "${number?}" && shift &&
+  directory=`prj_dirname "$1"` &&
+  basename=`prj_basename "$1"` &&
+  output=compile/move/${basename?} &&
+  shift &&
+  if make_"${number?}"; then
+    if test -f compile/sum-move/"${basename?}"; then
+      mv -f "${output?}" ./"${directory?}" &&
+      mv -f compile/sum-move/"${basename?}" compile/depsums/"${directory?}"
+    else :
+    fi &&
+    set 0 "$@"
+  else
+    set "$?" "$@"
+  fi &&
+  directory=$2 &&
+  basename=$3 &&
+  output=compile/move/${basename?} &&
+  eval "status_$4=\$1" &&
+  return "$1"
+} &&
+
+make_1() {
+  if checksum_ok command/ spf-download \
+       13 'src/spf-download=install' \
+       14 src/.mkmed-data/src/spf-download; then
+    rm -f compile/sum-move/spf-download &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making command/spf-download &&
+  mkmed_copy src/.mkmed-data/src/ spf-download spf-download
+} &&
+
+make_2() {
+  if checksum_ok command/ spf-install \
+       15 'src/spf-install=install' \
+       16 src/.mkmed-data/src/spf-install; then
+    rm -f compile/sum-move/spf-install &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making command/spf-install &&
+  mkmed_copy src/.mkmed-data/src/ spf-install spf-install
+} &&
+
+make_3() {
+  if checksum_ok command/ spf-path \
+       17 'src/spf-path=install' \
+       18 src/.mkmed-data/src/spf-path; then
+    rm -f compile/sum-move/spf-path &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making command/spf-path &&
+  mkmed_copy src/.mkmed-data/src/ spf-path spf-path
+} &&
+
+make_4() {
+  make_ compile/host/spf-unpack &&
+  if checksum_ok command/ spf-unpack \
+       19 'src/spf-unpack=install' \
+       8 compile/host/spf-unpack; then
+    rm -f compile/sum-move/spf-unpack &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making command/spf-unpack &&
+  mkmed_copy compile/host/ spf-unpack spf-unpack
+} &&
+
+make_5() {
+  if checksum_ok compile/conf/ package_home \
+       20 conf-compile/defaults/package_home \
+       21 conf-compile/package_home; then
+    rm -f compile/sum-move/package_home &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making compile/conf/package_home &&
+  if test -f conf-compile/package_home
+    then ln -s ../../conf-compile/package_home "${output?}"
+    else ln -s ../../conf-compile/defaults/package_home "${output?}"
+  fi
+} &&
+
+make_6() {
+  make_ compile/host/quote-conf-compile:package_home:sh &&
+  if checksum_ok compile/host/prjlibs-sh/ package_home.sh \
+       7 compile/host/quote-conf-compile:package_home:sh \
+       22 src/.mkmed-data/src/prjlibs-sh/package_home-1.sh \
+       23 'src/.mkmed-data/src/prjlibs-sh/package_home.sh=cat'; then
+    rm -f compile/sum-move/package_home.sh &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making compile/host/prjlibs-sh/package_home.sh &&
+  { cat \
+      ./src/.mkmed-data/src/prjlibs-sh/package_home-1.sh \
+      ./compile/host/quote-conf-compile:package_home:sh &&
+    sed '1,/^$/d' < 'src/.mkmed-data/src/prjlibs-sh/package_home.sh=cat'
+  } > "${output?}" &&
+  chmod 0644 "${output?}"
+} &&
+
+make_7() {
+  make_ compile/conf/package_home &&
+  if checksum_ok compile/host/ quote-conf-compile:package_home:sh \
+       5 compile/conf/package_home; then
+    rm -f compile/sum-move/quote-conf-compile:package_home:sh &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making compile/host/quote-conf-compile:package_home:sh &&
+  sed 's/'\''/'\''\'\'''\''/g
+s/^/'\''/
+s/$/'\''/
+q' \
+    < compile/conf/package_home \
+    > "${output?}"
+} &&
+
+make_8() {
+  make_ compile/host/prjlibs-sh/package_home.sh &&
+  if checksum_ok compile/host/ spf-unpack \
+       24 src/spftools.sh \
+       25 src/.mkmed-data/src/sptools-sh/sptools.sh \
+       26 src/.mkmed-data/src/prjlibs-sh/setuidgid.sh \
+       27 src/.mkmed-data/src/prjlibs-sh/which.sh \
+       28 src/.mkmed-data/src/prjlibs-sh/mkdir_p.sh \
+       29 src/.mkmed-data/src/prjlibs-sh/basename.sh \
+       30 src/.mkmed-data/src/prjlibs-sh/dirname.sh \
+       31 src/.mkmed-data/src/prjlibs-sh/sedarg1.sh \
+       32 src/.mkmed-data/src/prjlibs-sh/fail.sh \
+       33 src/.mkmed-data/src/prjlibs-sh/unset.sh \
+       34 src/.mkmed-data/src/prjlibs-sh/download.sh \
+       35 src/.mkmed-data/src/prjlibs-sh/anyeq.sh \
+       36 src/.mkmed-data/src/prjlibs-sh/match.sh \
+       37 src/.mkmed-data/src/prjlibs-sh/append.sh \
+       38 src/.mkmed-data/src/prjlibs-sh/x2.sh \
+       39 src/.mkmed-data/src/prjlibs-sh/u2.sh \
+       40 src/.mkmed-data/src/prjlibs-sh/let.sh \
+       41 src/.mkmed-data/src/prjlibs-sh/not.sh \
+       42 src/.mkmed-data/src/prjlibs-sh/echo.sh \
+       43 src/.mkmed-data/src/prjlibs-sh/qlist.sh \
+       44 src/.mkmed-data/src/prjlibs-sh/quote_sh.sh \
+       45 src/.mkmed-data/src/prjlibs-sh/capture.sh \
+       46 src/.mkmed-data/src/prjlibs-sh/id.sh \
+       47 src/.mkmed-data/src/prjlibs-sh/is_set.sh \
+       48 src/.mkmed-data/src/prjlibs-sh/tmpdir.sh \
+       49 src/.mkmed-data/src/prjlibs-sh/set_default.sh \
+       50 src/.mkmed-data/src/prjlibs-sh/set.sh \
+       6 compile/host/prjlibs-sh/package_home.sh \
+       51 src/.mkmed-data/src/prjlibs-sh/top.sh \
+       52 'src/spf-unpack=cat'; then
+    rm -f compile/sum-move/spf-unpack &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making compile/host/spf-unpack &&
+  { cat \
+      ./src/.mkmed-data/src/prjlibs-sh/top.sh \
+      ./compile/host/prjlibs-sh/package_home.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/set.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/set_default.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/tmpdir.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/is_set.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/id.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/capture.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/quote_sh.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/qlist.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/echo.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/not.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/let.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/u2.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/x2.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/append.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/match.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/anyeq.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/download.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/unset.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/fail.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/sedarg1.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/dirname.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/basename.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/mkdir_p.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/which.sh \
+      ./src/.mkmed-data/src/prjlibs-sh/setuidgid.sh \
+      ./src/.mkmed-data/src/sptools-sh/sptools.sh \
+      ./src/spftools.sh &&
+    sed '1,/^$/d' < 'src/spf-unpack=cat'
+  } > "${output?}" &&
+  chmod 0755 "${output?}"
+} &&
+
+make_9() {
+  if checksum_ok per-package/package/ check \
+       53 'src/check=install' \
+       54 src/.mkmed-data/src/check; then
+    rm -f compile/sum-move/check &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making per-package/package/check &&
+  mkmed_copy src/.mkmed-data/src/ check check
+} &&
+
+make_10() {
+  if checksum_ok per-package/package/ compile \
+       55 'src/compile=install' \
+       56 src/.mkmed-data/src/compile; then
+    rm -f compile/sum-move/compile &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making per-package/package/compile &&
+  mkmed_copy src/.mkmed-data/src/ compile compile
+} &&
+
+make_11() {
+  if checksum_ok per-package/package/ own \
+       57 'src/own=install' \
+       58 src/.mkmed-data/src/own; then
+    rm -f compile/sum-move/own &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making per-package/package/own &&
+  mkmed_copy src/.mkmed-data/src/ own own
+} &&
+
+make_12() {
+  if checksum_ok sh/ spftools.sh \
+       59 'src/spftools.sh=install' \
+       24 src/spftools.sh; then
+    rm -f compile/sum-move/spftools.sh &&
+    return 0
+  else :
+  fi &&
+  echo &&
+  prj_echo Making sh/spftools.sh &&
+  mkmed_copy src/ spftools.sh spftools.sh
+} &&
+
+if test "$#" = 0; then
+  set x \
+    command/spf-download \
+    command/spf-install \
+    command/spf-path \
+    command/spf-unpack \
+    per-package/package/check \
+    per-package/package/compile \
+    per-package/package/own \
+    sh/spftools.sh &&
+  shift
+else :
+fi &&
+
+prj_u2 prj_set failure_message \
+  'The following files were not made successfully:' &&
+while test "$#" != 0; do
+  { { make_ "$1" ||
+      { prj_set_default failure_status "$?" &&
+        failure_message="${failure_message?}
+$1"; }
+    } &&
+    shift
+  } || exit "$?"
+done &&
+echo &&
+if prj_is_set failure_status; then
+  prj_echo "${failure_message?}"
+  exit "${failure_status?}"
+else :
+fi &&
+echo All files were made successfully.

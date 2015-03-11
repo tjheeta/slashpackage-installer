@@ -1,0 +1,7 @@
+<URL:http://code.dogmap.org./spftools/>
+spftools is a set of tools for maintaining slashpackage-based installations
+of foreign packages in /package/misc/spf.
+
+spf-install installs a foreign package.
+
+spf-path scans /package building a $PATH-style environment variable.

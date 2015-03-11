@@ -1,0 +1,141 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+acct= && uid= && gid= &&
+unset acct uid gid &&
+acct=conf-compile/compile_user &&
+{ test -f "${acct?}" || acct=conf-compile/defaults/compile_user; } &&
+acct=`sed q < "${acct?}"` &&
+if test '' = "${acct?}"; then
+  package/compile
+else
+  :
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_id() {
+  ( case $PATH: in
+      /usr/xpg4/bin:*) :;;
+      :) PATH=/usr/xpg4/bin;;
+      *) PATH=/usr/xpg4/bin:${PATH?};;
+    esac &&
+    export PATH &&
+    exec id ${1+"$@"}
+  )
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_which_elt_= &&
+prj_which_rest_= &&
+unset prj_which_elt_ prj_which_rest_ &&
+prj_which_get_elt() {
+  sed '
+1h
+1!H
+$!d
+g
+s%:.*$%%
+/./s%$%/%
+' <<EOT
+${1?}
+EOT
+} &&
+prj_which_get_rest() {
+  sed '
+1h
+1!H
+$!d
+g
+s%^[^:]*:%%
+' <<EOT
+${1?}
+EOT
+} &&
+prj_which() {
+  : "${2?}" &&
+  prj_which_rest_= &&
+  if test "${3+x}" = x;  then prj_which_rest_=${prj_which_rest_?}$3:;    else :
+  fi &&
+  if test x"$PATH" != x; then prj_which_rest_=${prj_which_rest_?}$PATH:; else :
+  fi &&
+  if test "${4+x}" = x;  then prj_which_rest_=${prj_which_rest_?}$4:;    else :
+  fi &&
+  while test "${prj_which_rest_?}" != ''; do
+    { prj_which_elt_=`prj_which_get_elt "${prj_which_rest_?}"`$2 &&
+      if test -x "${prj_which_elt_?}" && test -f "${prj_which_elt_?}"; then
+        eval "$1=\${prj_which_elt_?}" &&
+        return 0
+      else :
+      fi &&
+      prj_which_rest_=`prj_which_get_rest "${prj_which_rest_?}"`
+    } || return "$?"
+  done &&
+  { echo "unable to find $2 in \$PATH" >&2
+    return 100
+  }
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+if (prj_which setuidgid_path setuidgid) 2> /dev/null; then
+  :
+elif (exec perl -e 'use POSIX qw(&setuid &setgid &getpwnam);') \
+       > /dev/null 2>&1; then
+  setuidgid() {
+    perl -le '
+use POSIX qw(&setuid &setgid &getpwnam);
+my ($acct, @args)=@ARGV;
+my @data=getpwnam($acct);
+my ($uid, $gid)=@data[2, 3];
+setgid($gid) or die("unable to set group id: ", $!, "\n");
+$)=$gid." ".$gid;
+$) eq $gid." ".$gid or die("unable to set groups\n");
+setuid($uid) or die("unable to set user id: ", $!, "\n");
+exec({ $args[0] } @args) or die("unable to exec ", $args[0], ": ", $!, "\n");
+' ${1+"$@"}
+  }
+elif (exec python -c 'import pwd') > /dev/null 2>&1; then
+  setuidgid() {
+    python -c '
+import sys, os, pwd
+acct=sys.argv[1]
+args=sys.argv[2:]
+data=pwd.getpwnam(acct)
+(uid, gid)=(data.pw_uid, data.pw_gid)
+os.setgid(gid)
+os.setgroups((gid,))
+os.setuid(uid)
+os.execvp(args[0], args)
+' ${1+"$@"}
+  }
+elif (exec guile -c "(or (defined? 'setgroups) (exit 1))") \
+       > /dev/null 2>&1; then
+  setuidgid() {
+    guile -c '
+(define argv (program-arguments))
+(define acct (cadr argv))
+(define args (cddr argv))
+(define data (getpwnam acct))
+(define uid (vector-ref data 2))
+(define gid (vector-ref data 3))
+(setgid gid)
+(setgroups (vector gid))
+(setuid uid)
+(apply execlp (car args) args)
+' ${1+"$@"}
+  }
+else
+  echo 'unable to find setuidgid' >&2
+  (exit 100)
+fi
+
+  case $? in 0) :;; *) (exit "$?");; esac &&
+  uid=`prj_id -u "${acct?}"` &&
+  chown -R "${uid?}" . &&
+  setuidgid "${acct?}" package/compile &&
+  uid=`prj_id -u` &&
+  gid=`prj_id -g` &&
+  chown -R "${uid?}:${gid?}" .
+fi &&
+package/own &&
+exec package/check

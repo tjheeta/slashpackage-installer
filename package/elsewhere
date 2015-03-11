@@ -1,0 +1,90 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_fail() {
+  : "${1?}" &&
+  set x "$*" &&
+  if test "${prj_program+x}" = x
+    then set x "${prj_program?}: $2"
+    else :
+  fi &&
+  case $2 in
+    -*|*\\*) cat <<EOT
+$2
+EOT
+      ;;
+    *) echo "$2";;
+  esac >&2
+  return 100
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_echo() {
+  case $* in
+    -*|*\\*)
+      # Avoid echo's nonportable behavior for switches and escapes.
+      cat <<EOT
+$*
+EOT
+      ;;
+    *)
+      # Use echo when we can get away with it, since it's typically a builtin.
+      echo "$*";;
+  esac
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_capture() {
+  eval "
+  shift &&
+  ${1?}"'=`${1+"$@"}`'
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_u2() {
+  : "${2?}" &&
+  "$@" &&
+  eval "
+  set x \"\$$2\" &&
+  $2= &&
+  unset $2 &&
+  $2=\$2"
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_set() {
+  eval "$1=\${2?}"
+}
+
+if test "$#" != 1
+  then prj_fail 'usage: package/elsewhere /path/to/dir'
+  else :
+fi &&
+
+mkdir "$1" &&
+prj_u2 prj_set file conf-compile/package_home &&
+{ test -f "${file?}" || file=conf-compile/defaults/package_home; } &&
+prj_u2 prj_capture x sed q < "${file?}" &&
+ln -s "${x?}" "$1/.real" &&
+
+tar -cf "$1"/conf-compile.tar conf-compile/. &&
+cd "$1" &&
+tar -xf conf-compile.tar &&
+rm -f conf-compile.tar &&
+
+x=conf-compile/package_home &&
+{ case $1 in
+    /*) prj_echo "$1";;
+    *) pwd;;
+  esac &&
+  sed 1d < "${file?}"
+} > "${x?}{new}" &&
+mv -f "${x?}{new}" "${x?}" &&
+
+for x in \
+    package \
+    src; do
+  ln -s .real/"${x?}" ./ || exit "$?"
+done

@@ -1,0 +1,76 @@
+Check package/README for package-specific installation notes.
+
+The compile-time configuration is controlled by files in conf-compile/.  You
+can override each file in conf-compile/defaults/ by creating a file directly
+in conf-compile/ with the same name.  Creating an overriding file instead of
+editing the existing file ensures that if you unpack the tarball again, you
+will not overwrite your customizations.  (The conf-compile files may refer to
+the "host" or "build" system; these terms refer to the system that you are
+installing the package for, and the system you are building the package on,
+respectively.  Typically, these two are the same, but they may be different
+if you are cross-compiling.)  Then to install the package, run
+package/install.  That is the complete procedure; the rest of this file
+describes more fine-grained steps, which you can ignore if you like.
+
+package/install is equivalent to "package/build && package/upgrade &&
+package/run".  It is intended to be very portable, but if your /bin/sh does
+not support some features it uses (such as shell functions), while you have
+another Bourne-compatible shell (such as bash) which does, then run
+"bash package/install" instead.
+
+package/build does everything involved in installing the package, except for
+system modifications outside the package directory.  After running
+package/build, you can remove the compile/ directory to save space.
+(Intermediate files are created in compile/, so the equivalent of "make
+clean" in other build systems is "rm -r compile".)  You can also remove the
+conf-compile/ directory, but you may want to keep those files for comparison
+against future versions, especially if you have made any changes.  Check
+package/README to see whether you can remove the src/ directory.
+package/build is equivalent to "package/compile && package/own &&
+package/check".
+
+package/compile creates all the files of the package.  It needs write
+permission to the package directory, but does not require any other special
+privileges.  After building the package (successfully or unsuccessfully), you
+can edit conf-compile/* and build again by re-running package/compile.  This
+will rebuild only the files that need to be rebuilt, as determined by
+checksumming the source files.  You can specify the checksum command
+explicitly in the first line of conf-compile/checksum; otherwise,
+package/compile will use the first of sha1sum, md5sum, md5, cksum, or sum
+that is available.  package/compile will update the package's files by
+atomically replacing them, but they will be replaced one at a time, so there
+will be a window where one file may not be consistent with another.
+package/compile may create a conf/ directory containing run-time
+configuration files.  You can change these files after building the package
+to customize it for your system.
+
+package/own makes any necessary changes in ownership and setuid/setgid bits
+on the package's files; if it does anything, it needs to run as root.
+
+package/check runs the package's tests, if there are any.
+
+package/upgrade is equivalent to "package/upgrade_version &&
+package/install_commands".
+
+package/upgrade_version updates the current-version symlink to point to this
+version of the package.  It is like "ln -s foo-1.0.0 /package/category/foo",
+but atomically replaces the symlink if it already exists.  Other software can
+access the currently installed version of this package through the symlink.
+
+package/install_commands creates symlinks in /command/ and /usr/local/bin/
+pointing to the package's commands, atomically replacing any existing
+symlinks or files with the same names.
+
+package/run may start some of the package's programs running to make its
+services available to the system.
+
+To set up another directory for this package in /some/where/else, run
+"package/elsewhere /some/where/else".  You can then build another copy of the
+package in that directory with a different compile-time configuration, or for
+a different architecture, etc.  It is safe to run more than one such build
+simultaneously.  The files which are shared among builds are those contained
+in the distribution tarball; these files are not modified by the build
+process.  The build process only creates new files, which are not shared
+among separate builds.  Your "make" command does not need to support VPATH or
+any other exotic features; package/compile does not even use the "make"
+command at all.

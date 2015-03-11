@@ -1,0 +1,84 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_dirname() {
+  sed '
+1h
+1!H
+$!d
+g
+s%[^/]*$%%
+' <<EOT
+${1?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_basename() {
+  sed '
+1h
+1!H
+g
+s%^.*/%%
+h
+$!d
+' <<EOT
+${1?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_sedarg1() {
+  sed -e '
+1h
+1!H
+$!d
+g
+'"$1" <<EOT
+${2?}
+EOT
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+prj_fail() {
+  : "${1?}" &&
+  set x "$*" &&
+  if test "${prj_program+x}" = x
+    then set x "${prj_program?}: $2"
+    else :
+  fi &&
+  case $2 in
+    -*|*\\*) cat <<EOT
+$2
+EOT
+      ;;
+    *) echo "$2";;
+  esac >&2
+  return 100
+}
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+echo 'Creating current-version symlink' &&
+prj_package= && home= && version= && tmp= &&
+unset prj_package home version tmp &&
+prj_package=package/upgrade_version &&
+tmp=conf-compile/package_home &&
+{ test -f "${tmp?}" || tmp=conf-compile/defaults/package_home; } &&
+home=`sed q < "${tmp?}"` &&
+case ${home?} in
+  /*[!/]*) :;;
+  *) prj_fail "${tmp?} must specify an absolute path other than /.";;
+esac &&
+home=`prj_sedarg1 's%/*$%%' "${home?}"` &&
+tmp=`prj_dirname "${home?}"` &&
+cd "${tmp?}" &&
+version=`prj_basename "${home?}"` &&
+home=`prj_sedarg1 's%-[0123456789].*$%%' "${version?}"` &&
+tmp=${version?}'{upgrade-tmp}' &&
+rm -rf ./"${tmp?}" &&
+mkdir "${tmp?}" &&
+ln -s "${version?}" "${tmp?}/${home?}" &&
+mv -f "${tmp?}/${home?}" . &&
+exec rmdir "${tmp?}"
