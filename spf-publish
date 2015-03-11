@@ -14,6 +14,7 @@ prj_set prj_program spf-publish &&
 sp_validate_root &&
 
 spf_make_depends_file_() {
+  prj_unset spf_url_ spf_dist_dir spf_tarbase spf_depends_file_ spf_depend_tmpline_ &&
   spf_url_=$1 &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
@@ -31,6 +32,7 @@ spf_make_depends_file_() {
     fi
 } &&
 spf_make_packages_() {
+  prj_unset spf_url_ spf_dist_dir spf_tarbase spf_depend_tmpline_ &&
   spf_url_=$1 &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
@@ -55,6 +57,7 @@ spf_make_tarball_() {
   # spf_url=/package/host/test.com/foreign/wget-1.16.3+spf+1
   # spf_base=wget - is set from the spf_parse function
   # spf_path_data=wget-data - is set from the spf_parse function
+  prj_unset spf_url_ spf_dist_dir spf_tarbase current_arch spf_foreign_dir_ &&
   spf_url_=$1 &&
   echo "Making tarball for ${spf_url_}" &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
