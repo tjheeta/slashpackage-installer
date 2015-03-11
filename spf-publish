@@ -13,23 +13,41 @@ case $? in 0) :;; *) (exit "$?");; esac &&
 prj_set prj_program spf-publish &&
 sp_validate_root &&
 
+spf_make_depends_file_() {
+  spf_url_=$1 &&
+  spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
+  spf_tar_base=`prj_basename "${spf_url_?}"` &&
+  spf_depends_file_=${spf_dist_dir_?}/$(arch)/${spf_tar_base?}.depends.txt &&
+  rm -f ${spf_depends_file_} &&
+  prj_u2 prj_getstatus is_static \
+    spf_is_static "${spf_url_?}" &&
+    if test 1 = "${is_static}"; then
+      for file in ${spf_url_}/conf-compile/depend_* ; do
+        if test -f $file ; then
+          read -r spf_depend_tmpline_<$file
+          echo ${spf_depend_tmpline_?} >> ${spf_depends_file_?}
+        fi
+      done
+    fi
+} &&
 spf_make_packages_() {
   spf_url_=$1 &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
+  # make the package tarball
   prj_u2 prj_getstatus is_static \
     spf_is_static "${spf_url_?}" &&
-  # make the package tarball
   spf_make_tarball_ ${spf_url_?} &&
+  spf_make_depends_file_ ${spf_url_?} &&
   # if it's a dynamic package grab dependencies
   # Not sure if we need to do this recursively here. 
-  spf_depends_file_=${spf_dist_dir_?}/$(arch)/${spf_tar_base?}.depends.txt &&
-  rm -f ${spf_depends_file_?} &&
-  if test 1 = "${is_static}"; then 
+  if test 1 = "${is_static}"; then
     for file in ${spf_url_}/conf-compile/depend_* ; do 
-      read -r spf_depend_tmpline_<$file
-      echo ${spf_depend_tmpline_?} >> ${spf_depends_file_?}
-      spf_make_tarball_ ${spf_depend_tmpline_}
+      if test -f $file ; then
+        read -r spf_depend_tmpline_<$file
+        spf_make_tarball_ ${spf_depend_tmpline_}
+        spf_make_depends_file_ ${spf_depend_tmpline_}
+      fi
     done
   fi
 } &&
@@ -54,9 +72,11 @@ spf_make_tarball_() {
     # copy the package file to tmpdir
     cp -Rp ${spf_url_?} ${spf_tmpdir_?} &&
     # copy the data dir and rename it to the correct tag
-    spf_foreign_dir_=$(prj_dirname $spf_url_) &&
-    spf_data_dir_=$(readlink ${spf_foreign_dir_}/${spf_base?}-data) &&
-    cp -Rp ${spf_foreign_dir_?}/${spf_data_dir_?} ${spf_tmpdir_?}/${spf_tar_base}-data &&
+    if test -h ${spf_foreign_dir_}/${spf_base?}-data ; then
+      spf_foreign_dir_=$(prj_dirname $spf_url_) &&
+      spf_data_dir_=$(readlink ${spf_foreign_dir_}/${spf_base?}-data) &&
+      cp -Rp ${spf_foreign_dir_?}/${spf_data_dir_?} ${spf_tmpdir_?}/${spf_tar_base}-data 
+    fi &&
     cd ${spf_tmpdir_?} &&
     # run a strip --strip-unneeded on the binaries
     for file in */command/* ; do 
@@ -67,7 +87,6 @@ spf_make_tarball_() {
     tar Jcpf ${spf_tar_base?}.tar.xz ./* &&
     mv ${spf_tmpdir_?}/${spf_tar_base?}.tar.xz ${spf_dist_dir_?}/${current_arch?} &&
     rm -rf ${spf_tmpdir_?}
-
   fi
 
 } &&
