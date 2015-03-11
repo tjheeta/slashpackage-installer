@@ -1,6 +1,10 @@
 #!/bin/sh
 case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
 CDPATH= && unset CDPATH
+case $? in 0) :;; *) (exit "$?");; esac &&
+package_home= &&
+unset package_home &&
+package_home="$( cd "$( dirname "$0" )" && pwd )"
 
 . ./prjlib.sh
 . ./spftools.sh
