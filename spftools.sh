@@ -846,6 +846,22 @@ spf_style_perl() {
   }
 }
 
+spf_is_static() {
+  sp_path_=$1 &&
+  for sp_dir in ${sp_path_}/command/ ${sp_path_}/library/ end; do
+    { if test end = "${sp_dir?}"; then break; else :; fi &&
+      set '' end &&
+      for file in ${sp_dir?}/*; do 
+        prj_u2 prj_getstatus tmp_var \
+           ldd "${file?}" > /dev/null 2>&1 &&
+        if test 0 = "${tmp_var}"; then 
+          return 1;
+        else :;
+        fi 
+      done 
+    } || return 0
+  done 
+} 
 #spf_warn() {
 #  echo_ >&2 "${spf_program?}: warning: $*" &&
 #  sleep 2 &&
