@@ -334,6 +334,11 @@ elif ( exec wget -V ) > /dev/null 2>&1; then
     : "${3?}" &&
     ( cd "$2" && rm -f "$3" && exec wget -nv "$1" )
   }
+elif ( exec wget -s http://www.google.com/ ) > /dev/null 2>&1; then
+  prj_download() {
+    : "${3?}" &&
+    ( cd "$2" && rm -f "$3" && exec wget -q "$1" )
+  }
 elif ( exec fetch -o - file:///dev/null ) > /dev/null 2>&1; then
   prj_download() {
     : "${3?}" &&

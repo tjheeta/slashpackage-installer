@@ -246,7 +246,9 @@ properly." &&
         package/upgrade_version
     ) &&
     ( cd "${package_home?}"/per-package &&
-      exec tar -rf "${spf_path_compile?}"/tmp/tar *
+      cd ${spf_tmpdir_?} && tar xf "${spf_path_compile?}"/tmp/tar &&
+      cp -p "${package_home?}"/per-package/package/* ${spf_tmpdir_?}/package &&
+      exec tar -cvf "${spf_path_compile?}"/tmp/tar package/
     ) &&
     ( cd "${sp_path?}" &&
       exec tar -xf "${spf_path_compile?}"/tmp/tar ) &&
