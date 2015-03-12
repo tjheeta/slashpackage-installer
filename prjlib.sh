@@ -560,4 +560,14 @@ s%//*[^/]*$%%
   for prj_mkdir_p_tmp_ in ${1+"$@"}; do
     mkdir "${prj_mkdir_p_tmp_?}" || return "$?"
   done
+} &&
+prj_cpdir() {
+  # takes two arguments - src dest, result is dest/src
+  case ${2?} in
+    '') echo >&2 'prj_cpdir: dest must not be empty'; return 100;;
+    *[!/]*) :;;
+    *) return 0;;
+  esac &&
+  prj_mkdir_p ${2} &&
+  cd ${1} && tar -c .  | tar -C ${2}/ -x
 }
