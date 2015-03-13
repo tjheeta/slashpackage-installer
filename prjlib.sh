@@ -563,6 +563,9 @@ s%//*[^/]*$%%
 } &&
 prj_cpdir() {
   # takes two arguments - src dest, result is dest/src
+  # takes two arguments - src dest
+  # result is src/* is in dest/*
+
   case ${2?} in
     '') echo >&2 'prj_cpdir: dest must not be empty'; return 100;;
     *[!/]*) :;;

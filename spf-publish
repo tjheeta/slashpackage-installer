@@ -65,8 +65,8 @@ spf_make_tarball_() {
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
   current_arch=$(uname -m) &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
-  if prj_exists ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.xz; then
-    echo "Package ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.xz already exists"
+  if prj_exists ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.gz; then
+    echo "Package ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.gz already exists"
   else
     prj_mkdir_p ${spf_dist_dir_?}/${current_arch?} &&
     prj_mkdir_p ${spf_dist_dir_?}/tmp &&
@@ -75,12 +75,12 @@ spf_make_tarball_() {
     { prj_is_set spf_tmpdir_ ||
       prj_tmpdir spf_tmpdir_ "${spf_dist_dir_?}/tmp"; } &&
     # copy the package file to tmpdir - cp -Rp seems to fail on busybox
-    prj_cpdir ${spf_url_?} ${spf_tmpdir_?}/${spf_tarbase} && 
+    prj_cpdir ${spf_url_?} ${spf_tmpdir_?}/${spf_tar_base?} && 
     # copy the data dir and rename it to the correct tag
     if test -h ${spf_foreign_dir_}/${spf_base?}-data ; then
       spf_foreign_dir_=$(prj_dirname $spf_url_) &&
       spf_data_dir_=$(readlink ${spf_foreign_dir_}/${spf_base?}-data) &&
-      prj_cpdir ${spf_foreign_dir_?}/${spf_data_dir_?} ${spf_tmpdir_?}/${spf_tar_base}-data 
+      prj_cpdir ${spf_foreign_dir_?}/${spf_data_dir_?} ${spf_tmpdir_?}/${spf_tar_base?}-data 
     fi &&
     cd ${spf_tmpdir_?} &&
     # run a strip --strip-unneeded on the binaries
@@ -89,8 +89,8 @@ spf_make_tarball_() {
         strip --strip-unneeded $file 2>&1 > /dev/null || :
       fi
     done &&
-    tar Jcpf ${spf_tar_base?}.tar.xz ./* &&
-    mv ${spf_tmpdir_?}/${spf_tar_base?}.tar.xz ${spf_dist_dir_?}/${current_arch?} &&
+    tar zcpf ${spf_tar_base?}.tar.gz ./* &&
+    mv ${spf_tmpdir_?}/${spf_tar_base?}.tar.gz ${spf_dist_dir_?}/${current_arch?} &&
     rm -rf ${spf_tmpdir_?}
   fi
 
