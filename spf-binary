@@ -56,8 +56,14 @@ spf_binary_() {
     # change the index to just have names, not arch to remove basename
     prj_mkdir_p ${sp_dir?}/cache/${spf_uname_m?} &&
     if test "${spf_tmp_bin_pkg_name?}"; then
-      spf_download_binary_ ${spf_tmp_bin_pkg_name?}
-      sp-version ${sp_dir?}/${spf_tmp_bin_pkg_name?}
+      spf_download_binary_ ${spf_tmp_bin_pkg_name?} &&
+      sp-version ${sp_dir?}/${spf_tmp_bin_pkg_name?} &&
+      prj_mkdir_p ${sp_dir?}/../command/ &&
+      prj_mkdir_p ${sp_dir?}/../library/ &&
+      prj_mkdir_p ${sp_dir?}/../include/ &&
+      sp-links ${sp_dir?}/${spf_base?}/command/ ${sp_dir?}/../command/ &&
+      sp-links ${sp_dir?}/${spf_base?}/library/ ${sp_dir?}/../library/ &&
+      sp-links ${sp_dir?}/${spf_base?}/include/ ${sp_dir?}/../include/ &&
       if test -L ${sp_dir?}/${spf_base?}-data; then
         echo "Data dir already exists"
       else
