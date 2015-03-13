@@ -34,6 +34,19 @@ spf_make_depends_file_() {
       done
     fi
 } &&
+spf_add_to_index_() {
+  prj_unset spf_url_ spf_dist_dir spf_tarbase &&
+  spf_url_=$1 &&
+  spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
+  spf_tar_base=`prj_basename "${spf_url_?}"` &&
+  spf_index_file=${spf_dist_dir_?}/index-${spf_uname_m}.txt &&
+  if grep -xq ${spf_tar_base?} ${spf_index_file?}; then
+    echo "Already in index"
+  else
+    echo ${spf_tar_base?} >> ${spf_index_file?} 
+  fi
+} &&
+
 spf_make_packages_() {
   prj_unset spf_url_ spf_dist_dir spf_tarbase spf_depend_tmpline_ &&
   spf_url_=$1 &&
@@ -44,14 +57,16 @@ spf_make_packages_() {
     spf_is_static "${spf_url_?}" &&
   spf_make_tarball_ ${spf_url_?} &&
   spf_make_depends_file_ ${spf_url_?} &&
+  spf_add_to_index_ ${spf_url_?} &&
   # if it's a dynamic package grab dependencies
   # Not sure if we need to do this recursively here. 
   if test 1 = "${is_static}"; then
     for file in ${spf_url_}/conf-compile/depend_* ; do 
       if test -f $file ; then
         read -r spf_depend_tmpline_<$file
-        spf_make_tarball_ ${spf_depend_tmpline_}
-        spf_make_depends_file_ ${spf_depend_tmpline_}
+        spf_make_tarball_ ${spf_depend_tmpline_} &&
+        spf_make_depends_file_ ${spf_depend_tmpline_} &&
+        spf_add_to_index_ ${spf_url_?} 
       fi
     done
   fi
