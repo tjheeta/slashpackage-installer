@@ -6,9 +6,10 @@ package_home= &&
 unset package_home &&
 package_home="$( cd "$( dirname "$0" )" && pwd )"
 
-. ./prjlib.sh
-. ./spftools.sh
-. ./sptools.sh
+DIR="$( cd "$( dirname "$0" )" && pwd )"
+. ${DIR}/prjlib.sh
+. ${DIR}/spftools.sh
+. ${DIR}/sptools.sh
 
 case $? in 0) :;; *) (exit "$?");; esac &&
 { test "$#" != 0 ||

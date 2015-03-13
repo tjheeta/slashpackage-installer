@@ -2,9 +2,10 @@
 case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
 CDPATH= && unset CDPATH
 
-. ./prjlib.sh
-. ./sptools.sh
-. ./spftools.sh
+DIR="$( cd "$( dirname "$0" )" && pwd )"
+. ${DIR}/prjlib.sh
+. ${DIR}/spftools.sh
+. ${DIR}/sptools.sh
 
 case $? in 0) :;; *) (exit "$?");; esac &&
 { test "$#" != 0 ||
