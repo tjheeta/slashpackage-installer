@@ -74,7 +74,13 @@ spf_binary_() {
       fi
       prj_capture spf_tmp_depends_ spf_binary_dependencies ${spf_tmp_bin_pkg_name?}
       for x in ${spf_tmp_depends_?} ; do
+          spf_parse "${x?}" &&
           spf_download_binary_ ${x?}
+          if test -L ${sp_dir?}/${spf_base?} ; then
+            echo "Dependency already has symlink"
+          else
+            sp-version ${x?}
+          fi
       done 
     else
       echo "No binary found"
