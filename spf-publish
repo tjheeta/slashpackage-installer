@@ -64,6 +64,7 @@ spf_make_tarball_() {
   echo "Making tarball for ${spf_url_}" &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
   current_arch=$(uname -m) &&
+  spf_foreign_dir_=$(prj_dirname $spf_url_) &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
   if prj_exists ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.gz; then
     echo "Package ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.gz already exists"
@@ -77,9 +78,8 @@ spf_make_tarball_() {
     # copy the package file to tmpdir - cp -Rp seems to fail on busybox
     prj_cpdir ${spf_url_?} ${spf_tmpdir_?}/${spf_tar_base?} && 
     # copy the data dir and rename it to the correct tag
-    if test -h ${spf_foreign_dir_}/${spf_base?}-data ; then
-      spf_foreign_dir_=$(prj_dirname $spf_url_) &&
-      spf_data_dir_=$(readlink ${spf_foreign_dir_}/${spf_base?}-data) &&
+    if test -h ${spf_foreign_dir_?}/${spf_base?}-data ; then
+      spf_data_dir_=$(readlink ${spf_foreign_dir_?}/${spf_base?}-data) &&
       prj_cpdir ${spf_foreign_dir_?}/${spf_data_dir_?} ${spf_tmpdir_?}/${spf_tar_base?}-data 
     fi &&
     cd ${spf_tmpdir_?} &&
