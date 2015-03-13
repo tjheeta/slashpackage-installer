@@ -1,0 +1,95 @@
+#!/bin/sh
+case $ZSH_VERSION in '') :;; *) alias -g '${1+"$@"}="$@"';; esac &&
+CDPATH= && unset CDPATH
+
+. ./prjlib.sh
+. ./sptools.sh
+. ./spftools.sh
+
+case $? in 0) :;; *) (exit "$?");; esac &&
+{ test "$#" != 0 ||
+  prj_fail 'usage: spf-binary /package/host/example.org/foreign/foo-1.2.3[+spf4] [...]'
+} &&
+prj_set prj_program spf-binary &&
+sp_validate_root &&
+
+# even static packages should have a depends file to know what versions are linked
+# dynamic versions should take the actual path to see what it depends against
+spf_make_depends_file_() {
+  prj_unset spf_url_ spf_dist_dir spf_tarbase spf_depends_file_ spf_depend_tmpline_ &&
+  spf_url_=$1 &&
+  spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
+  spf_tar_base=`prj_basename "${spf_url_?}"` &&
+  spf_depends_file_=${spf_dist_dir_?}/$(uname -m)/${spf_tar_base?}.depends.txt &&
+  rm -f ${spf_depends_file_} &&
+  prj_u2 prj_getstatus is_static \
+    spf_is_static "${spf_url_?}" &&
+    if test 1 = "${is_static}"; then
+      for file in ${spf_url_}/conf-compile/depend_* ; do
+        if test -f $file ; then
+          read -r spf_depend_tmpline_<$file
+          echo ${spf_depend_tmpline_?} >> ${spf_depends_file_?}
+        fi
+      done
+    fi
+} &&
+spf_download_binary_() {
+    spf_tmp_bin_pkg_name=$(basename $1)
+    if prj_exists ${sp_dir?}/${spf_tmp_bin_pkg_name?} ; then
+      echo "Package ${spf_tmp_bin_pkg_name?} already installed";
+      return 0;
+    fi
+    { prj_download \
+          "http://${spf_host?}/slashpackage-foreign/dist/$(arch)/${spf_tmp_bin_pkg_name}.tar.gz" \
+          ${sp_dir?}/cache/$(arch) ${spf_tmp_bin_pkg_name?}.tar.gz || spf_no_binaries_found=1
+    }
+    cd ${sp_dir?} &&
+    echo "BEFORE TAR - ${spf_tmp_bin_pkg_name?}" &&
+    tar xf ${sp_dir?}/cache/$(arch)/${spf_tmp_bin_pkg_name?}.tar.gz &&
+    echo "AFTER TAR"
+} &&
+spf_binary_() {
+    spf_binary_index_search
+    prj_u2 prj_capture spf_tmp_bin_pkg_name spf_binary_index_search &&
+
+    # change the index to just have names, not arch to remove basename
+    prj_mkdir_p ${sp_dir?}/cache/$(arch) &&
+    if test "${spf_tmp_bin_pkg_name?}"; then
+      spf_download_binary_ ${spf_tmp_bin_pkg_name?}
+      sp-version ${sp_dir?}/${spf_tmp_bin_pkg_name?}
+      if test -L ${sp_dir?}/${spf_base?}-data; then
+        echo "Data dir already exists"
+      else
+        echo "Linking data dir ${sp_dir?}/${spf_tmp_bin_pkg_name?}-data" &&
+        cd ${sp_dir?} && ln -s ${sp_dir?}/${spf_tmp_bin_pkg_name?}-data ${sp_dir?}/${spf_base?}-data 
+      fi
+      prj_capture spf_tmp_depends_ spf_binary_dependencies ${spf_tmp_bin_pkg_name?}
+      for x in ${spf_tmp_depends_?} ; do
+          spf_download_binary_ ${x?}
+      done 
+    else
+      echo "No binary found"
+    fi
+} &&
+
+prj_unset spf_url_ spf_tmp_ spf_tardir_ spf_tmpdir_ &&
+for sp_path in ${1+"$@"}; do
+  { sp_path=`prj_sedarg1 's%/*$%%' "${sp_path?}"` &&
+    case ${sp_path?} in
+      /*) :;;
+      *) prj_fail "package path must be absolute: ${sp_path?}";;
+    esac &&
+    spf_parse "${sp_path?}" &&
+    spf_binary_index_fetch &&
+    eval "set x ${sp_path?}" && shift &&
+    while test "$#" != 0; do
+      { eval "spf_binary_ $1" &&
+        shift
+      } || exit "$?"
+    done
+  } || exit "$?"
+done &&
+if prj_is_set spf_tmpdir_
+  then rm -rf "${spf_tmpdir_?}"
+  else :
+fi

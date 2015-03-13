@@ -844,7 +844,7 @@ spf_style_perl() {
     prj_x2 prj_prepend PERL5LIB "${spf_path_prefix?}"/lib/site_perl &&
     make test
   }
-}
+} &&
 
 spf_is_static() {
   sp_path_=$1 &&
@@ -861,7 +861,44 @@ spf_is_static() {
       done 
     } || return 0
   done 
-} 
+}  &&
+
+spf_binary_index_fetch() {
+  # put the index file in /package/host/$host/foreign/.indexes/
+  prj_mkdir_p ${sp_dir?}/.index &&
+  prj_download \
+    http://"${spf_host?}"/slashpackage-foreign/dist/index-$(arch).txt \
+    ${sp_dir?}/.index index-$(arch).txt
+} &&
+spf_binary_index_search() {
+  pkg=""
+  if  test -n "${spf_version}"; then
+    search_str="${spf_base}-${spf_version}${spf_vtag}${spf_btag}"
+    #echo "version=${spf_version}"
+    #echo "str=${search_str}"
+    #echo "${sp_dir?}/.index/index-$(arch).txt"
+    pkg=$(grep ${search_str?} ${sp_dir?}/.index/index-$(arch).txt | tail -n1 )
+
+    #echo "pkg=$pkg"
+    if test -n "${pkg}"; then  
+      echo "${pkg}"
+    fi
+  else
+    #echo ${spf_version}
+    search_str="${spf_base}"
+    pkg=$(grep ${search_str?} ${sp_dir?}/.index/index-$(arch).txt | tail -n1 )
+    if test ${pkg}; then
+      echo "${pkg}"
+    fi
+  fi
+} &&
+spf_binary_dependencies() {
+  prj_download \
+    http://"${spf_host?}"/slashpackage-foreign/dist/$(arch)/$1.depends.txt \
+    ${sp_dir?}/.index/ $1.depends.txt
+  cat ${sp_dir?}/.index/$1.depends.txt
+  
+}
 #spf_warn() {
 #  echo_ >&2 "${spf_program?}: warning: $*" &&
 #  sleep 2 &&
