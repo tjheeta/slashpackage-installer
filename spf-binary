@@ -60,8 +60,10 @@ spf_binary_() {
       if test -L ${sp_dir?}/${spf_base?}-data; then
         echo "Data dir already exists"
       else
-        echo "Linking data dir ${sp_dir?}/${spf_tmp_bin_pkg_name?}-data" &&
-        cd ${sp_dir?} && ln -s ${sp_dir?}/${spf_tmp_bin_pkg_name?}-data ${sp_dir?}/${spf_base?}-data 
+        if test -f ${sp_dir?}/${spf_tmp_bin_pkg_name?}-data; then
+          echo "Linking data dir ${sp_dir?}/${spf_tmp_bin_pkg_name?}-data" &&
+          cd ${sp_dir?} && ln -s ${sp_dir?}/${spf_tmp_bin_pkg_name?}-data ${sp_dir?}/${spf_base?}-data 
+        fi
       fi
       prj_capture spf_tmp_depends_ spf_binary_dependencies ${spf_tmp_bin_pkg_name?}
       for x in ${spf_tmp_depends_?} ; do
