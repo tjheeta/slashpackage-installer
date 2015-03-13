@@ -895,8 +895,11 @@ spf_binary_dependencies() {
   prj_download \
     http://"${spf_host?}"/slashpackage-foreign/dist/${spf_uname_m?}/$1.depends.txt \
     ${sp_dir?}/.index/ $1.depends.txt
-  cat ${sp_dir?}/.index/$1.depends.txt
-  
+  if test -f ${sp_dir?}/.index/$1.depends.txt; then
+    cat ${sp_dir?}/.index/$1.depends.txt
+  else
+    echo ""
+  fi
 }
 #spf_warn() {
 #  echo_ >&2 "${spf_program?}: warning: $*" &&
