@@ -59,17 +59,16 @@ spf_make_tarball_() {
   # spf_url=/package/host/test.com/foreign/wget-1.16.3+spf+1
   # spf_base=wget - is set from the spf_parse function
   # spf_path_data=wget-data - is set from the spf_parse function
-  prj_unset spf_url_ spf_dist_dir spf_tarbase current_arch spf_foreign_dir_ &&
+  prj_unset spf_url_ spf_dist_dir spf_tarbase spf_foreign_dir_ &&
   spf_url_=$1 &&
   echo "Making tarball for ${spf_url_}" &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
-  current_arch=$(uname -m) &&
   spf_foreign_dir_=$(prj_dirname $spf_url_) &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
-  if prj_exists ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.gz; then
-    echo "Package ${spf_dist_dir_?}/${current_arch?}/${spf_tar_base?}.tar.gz already exists"
+  if prj_exists ${spf_dist_dir_?}/${spf_uname_m?}/${spf_tar_base?}.tar.gz; then
+    echo "Package ${spf_dist_dir_?}/${spf_uname_m?}/${spf_tar_base?}.tar.gz already exists"
   else
-    prj_mkdir_p ${spf_dist_dir_?}/${current_arch?} &&
+    prj_mkdir_p ${spf_dist_dir_?}/${spf_uname_m?} &&
     prj_mkdir_p ${spf_dist_dir_?}/tmp &&
     prj_u2 prj_getstatus is_static \
       spf_is_static "${spf_url_?}" &&
@@ -90,7 +89,7 @@ spf_make_tarball_() {
       fi
     done &&
     tar zcpf ${spf_tar_base?}.tar.gz ./* &&
-    mv ${spf_tmpdir_?}/${spf_tar_base?}.tar.gz ${spf_dist_dir_?}/${current_arch?} &&
+    mv ${spf_tmpdir_?}/${spf_tar_base?}.tar.gz ${spf_dist_dir_?}/${spf_uname_m?} &&
     rm -rf ${spf_tmpdir_?}
   fi
 

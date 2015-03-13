@@ -20,7 +20,7 @@ spf_make_depends_file_() {
   spf_url_=$1 &&
   spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
   spf_tar_base=`prj_basename "${spf_url_?}"` &&
-  spf_depends_file_=${spf_dist_dir_?}/$(uname -m)/${spf_tar_base?}.depends.txt &&
+  spf_depends_file_=${spf_dist_dir_?}/${spf_uname_m}/${spf_tar_base?}.depends.txt &&
   rm -f ${spf_depends_file_} &&
   prj_u2 prj_getstatus is_static \
     spf_is_static "${spf_url_?}" &&
@@ -40,12 +40,12 @@ spf_download_binary_() {
       return 0;
     fi
     { prj_download \
-          "http://${spf_host?}/slashpackage-foreign/dist/$(arch)/${spf_tmp_bin_pkg_name}.tar.gz" \
-          ${sp_dir?}/cache/$(arch) ${spf_tmp_bin_pkg_name?}.tar.gz || spf_no_binaries_found=1
+          "http://${spf_host?}/slashpackage-foreign/dist/${spf_uname_m?}/${spf_tmp_bin_pkg_name}.tar.gz" \
+          ${sp_dir?}/cache/${spf_uname_m?} ${spf_tmp_bin_pkg_name?}.tar.gz || spf_no_binaries_found=1
     }
     cd ${sp_dir?} &&
     echo "BEFORE TAR - ${spf_tmp_bin_pkg_name?}" &&
-    tar xf ${sp_dir?}/cache/$(arch)/${spf_tmp_bin_pkg_name?}.tar.gz &&
+    tar xf ${sp_dir?}/cache/${spf_uname_m?}/${spf_tmp_bin_pkg_name?}.tar.gz &&
     echo "AFTER TAR"
 } &&
 spf_binary_() {
@@ -53,7 +53,7 @@ spf_binary_() {
     prj_u2 prj_capture spf_tmp_bin_pkg_name spf_binary_index_search &&
 
     # change the index to just have names, not arch to remove basename
-    prj_mkdir_p ${sp_dir?}/cache/$(arch) &&
+    prj_mkdir_p ${sp_dir?}/cache/${spf_uname_m?} &&
     if test "${spf_tmp_bin_pkg_name?}"; then
       spf_download_binary_ ${spf_tmp_bin_pkg_name?}
       sp-version ${sp_dir?}/${spf_tmp_bin_pkg_name?}

@@ -867,8 +867,8 @@ spf_binary_index_fetch() {
   # put the index file in /package/host/$host/foreign/.indexes/
   prj_mkdir_p ${sp_dir?}/.index &&
   prj_download \
-    http://"${spf_host?}"/slashpackage-foreign/dist/index-$(arch).txt \
-    ${sp_dir?}/.index index-$(arch).txt
+    http://"${spf_host?}"/slashpackage-foreign/dist/index-${spf_uname_m?}.txt \
+    ${sp_dir?}/.index index-${spf_uname_m?}.txt
 } &&
 spf_binary_index_search() {
   pkg=""
@@ -876,8 +876,7 @@ spf_binary_index_search() {
     search_str="${spf_base}-${spf_version}${spf_vtag}${spf_btag}"
     #echo "version=${spf_version}"
     #echo "str=${search_str}"
-    #echo "${sp_dir?}/.index/index-$(arch).txt"
-    pkg=$(grep ${search_str?} ${sp_dir?}/.index/index-$(arch).txt | tail -n1 )
+    pkg=$(grep ${search_str?} ${sp_dir?}/.index/index-${spf_uname_m?}.txt | tail -n1 )
 
     #echo "pkg=$pkg"
     if test -n "${pkg}"; then  
@@ -886,7 +885,7 @@ spf_binary_index_search() {
   else
     #echo ${spf_version}
     search_str="${spf_base}"
-    pkg=$(grep ${search_str?} ${sp_dir?}/.index/index-$(arch).txt | tail -n1 )
+    pkg=$(grep ${search_str?} ${sp_dir?}/.index/index-${spf_uname_m?}.txt | tail -n1 )
     if test ${pkg}; then
       echo "${pkg}"
     fi
@@ -894,7 +893,7 @@ spf_binary_index_search() {
 } &&
 spf_binary_dependencies() {
   prj_download \
-    http://"${spf_host?}"/slashpackage-foreign/dist/$(arch)/$1.depends.txt \
+    http://"${spf_host?}"/slashpackage-foreign/dist/${spf_uname_m?}/$1.depends.txt \
     ${sp_dir?}/.index/ $1.depends.txt
   cat ${sp_dir?}/.index/$1.depends.txt
   
