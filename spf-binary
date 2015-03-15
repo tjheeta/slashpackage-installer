@@ -14,26 +14,6 @@ case $? in 0) :;; *) (exit "$?");; esac &&
 prj_set prj_program spf-binary &&
 sp_validate_root &&
 
-# even static packages should have a depends file to know what versions are linked
-# dynamic versions should take the actual path to see what it depends against
-spf_make_depends_file_() {
-  prj_unset spf_url_ spf_dist_dir spf_tarbase spf_depends_file_ spf_depend_tmpline_ &&
-  spf_url_=$1 &&
-  spf_dist_dir_=$SP_ROOT/package/host/${spf_host?}/dist/ &&
-  spf_tar_base=`prj_basename "${spf_url_?}"` &&
-  spf_depends_file_=${spf_dist_dir_?}/${spf_uname_m}/${spf_tar_base?}.depends.txt &&
-  rm -f ${spf_depends_file_} &&
-  prj_u2 prj_getstatus is_static \
-    spf_is_static "${spf_url_?}" &&
-    if test 1 = "${is_static}"; then
-      for file in ${spf_url_}/conf-compile/depend_* ; do
-        if test -f $file ; then
-          read -r spf_depend_tmpline_<$file
-          echo ${spf_depend_tmpline_?} >> ${spf_depends_file_?}
-        fi
-      done
-    fi
-} &&
 spf_download_binary_() {
     spf_tmp_bin_pkg_name=$(basename $1)
     if prj_exists ${sp_dir?}/${spf_tmp_bin_pkg_name?} ; then
@@ -45,9 +25,7 @@ spf_download_binary_() {
           ${sp_dir?}/cache/${spf_uname_m?} ${spf_tmp_bin_pkg_name?}.tar.gz || spf_no_binaries_found=1
     }
     cd ${sp_dir?} &&
-    echo "BEFORE TAR - ${spf_tmp_bin_pkg_name?}" &&
     tar xf ${sp_dir?}/cache/${spf_uname_m?}/${spf_tmp_bin_pkg_name?}.tar.gz &&
-    echo "AFTER TAR"
 } &&
 spf_binary_() {
     spf_binary_index_search
