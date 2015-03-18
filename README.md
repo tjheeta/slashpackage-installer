@@ -39,7 +39,7 @@ cd /vagrant/
 If you don't want to use vagrant, then there is a script "machine-setup.sh", which will make the directories.
 
 ### Setup the toolchain to use musl
-If you want to compile everything against musl, do the following which will setup gcc to use musl. All the following examples will use the snippets at spf.fxmanifold.com, and there are some older packages available at [http://code.dogmap.org./slashpackage-foreign/][slashpackage]. 
+If you want to compile everything against musl, do the following which will setup gcc to use musl. All the following examples will use the snippets at spf.fxmanifold.com, and there are some older packages available at http://code.dogmap.org./slashpackage-foreign/
 ```
 sudo -s
 export PATH=/command:$PATH:/vagrant
