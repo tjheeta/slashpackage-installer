@@ -215,7 +215,7 @@ for sp_path in ${1+"$@"}; do
       else :
     fi &&
     spf_load_info &&
-    SPF_OFFLINE_SCRIPTS=y spf-download "${sp_path?}" &&
+    SPF_OFFLINE_SCRIPTS=y ${DIR}/spf-download "${sp_path?}" &&
     sp_mkdir &&
     spf_cc compile_user '' 'The account on the first line of this file is used to compile the package.' &&
     spf_cc package_home "${sp_path?}" \

@@ -25,7 +25,7 @@ spf_download_binary_() {
           ${sp_dir?}/cache/${spf_uname_m?} ${spf_tmp_bin_pkg_name?}.tar.gz || spf_no_binaries_found=1
     }
     cd ${sp_dir?} &&
-    tar xf ${sp_dir?}/cache/${spf_uname_m?}/${spf_tmp_bin_pkg_name?}.tar.gz &&
+    tar xf ${sp_dir?}/cache/${spf_uname_m?}/${spf_tmp_bin_pkg_name?}.tar.gz 
 } &&
 spf_binary_() {
     spf_binary_index_search
@@ -35,13 +35,13 @@ spf_binary_() {
     prj_mkdir_p ${sp_dir?}/cache/${spf_uname_m?} &&
     if test "${spf_tmp_bin_pkg_name?}"; then
       spf_download_binary_ ${spf_tmp_bin_pkg_name?} &&
-      sp-version ${sp_dir?}/${spf_tmp_bin_pkg_name?} &&
+      ${DIR}/sp-version ${sp_dir?}/${spf_tmp_bin_pkg_name?} &&
       prj_mkdir_p ${sp_dir?}/../command/ &&
       prj_mkdir_p ${sp_dir?}/../library/ &&
       prj_mkdir_p ${sp_dir?}/../include/ &&
-      sp-links ${sp_dir?}/${spf_base?}/command/ ${sp_dir?}/../command/ &&
-      sp-links ${sp_dir?}/${spf_base?}/library/ ${sp_dir?}/../library/ &&
-      sp-links ${sp_dir?}/${spf_base?}/include/ ${sp_dir?}/../include/ &&
+      ${DIR}/sp-links ${sp_dir?}/${spf_base?}/command/ ${sp_dir?}/../command/ &&
+      ${DIR}/sp-links ${sp_dir?}/${spf_base?}/library/ ${sp_dir?}/../library/ &&
+      ${DIR}/sp-links ${sp_dir?}/${spf_base?}/include/ ${sp_dir?}/../include/ &&
       if test -L ${sp_dir?}/${spf_base?}-data; then
         echo "Data dir already exists"
       else
@@ -57,7 +57,7 @@ spf_binary_() {
           if test -L ${sp_dir?}/${spf_base?} ; then
             echo "Dependency already has symlink"
           else
-            sp-version ${x?}
+            ${DIR}/sp-version ${x?}
           fi
       done 
     else

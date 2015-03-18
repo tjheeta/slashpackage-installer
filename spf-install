@@ -333,7 +333,7 @@ spf_install_check_version() {
   } || return "$?"; done &&
   if prj_is_set spf_install_vtag; then
     if test '' != "${spf_install_vtag?}"
-      then sp-version "${spf_install_dir?}${spf_base?}-${spf_version?}+spf+${spf_install_vtag?}"
+      then ${DIR}/sp-version "${spf_install_dir?}${spf_base?}-${spf_version?}+spf+${spf_install_vtag?}"
       else :
     fi &&
     spf_install_version_ok=y
@@ -385,7 +385,7 @@ spf_install_ensure_version() {
   spf_hook BEFORE_UNPACK &&
   { test "${sp_hook_status?}" != 99 || return 0; } &&
   rm -rf "${spf_path_compile?}" &&
-  SPF_OFFLINE_SCRIPTS=y spf-unpack "${sp_path?}" &&
+  SPF_OFFLINE_SCRIPTS=y ${DIR}/spf-unpack "${sp_path?}" &&
   spf_hook AFTER_UNPACK &&
   { test "${sp_hook_status?}" != 99 || return 0; } &&
 
@@ -402,7 +402,7 @@ spf_install_ensure_version() {
   if test '' = "${spf_data_list?}" ||
      test -d "${sp_dir?}/${spf_base?}"-data/.; then :; else
     prj_mkdir_p "${sp_dir?}/${spf_base?}"-data-0 &&
-    sp-version "${sp_dir?}/${spf_base?}"-data-0
+    ${DIR}/sp-version "${sp_dir?}/${spf_base?}"-data-0
   fi &&
 
   if prj_is_set SP_COMPILE_USER; then
@@ -464,7 +464,7 @@ spf_install_ensure_version() {
   spf_hook AFTER_CLEAN &&
   { test "${sp_hook_status?}" != 99 || return 0; } &&
 
-  sp-version "${sp_path?}" &&
+  ${DIR}/sp-version "${sp_path?}" &&
   spf_hook AFTER_VERSION &&
   { test "${sp_hook_status?}" != 99 || return 0; } &&
 
@@ -476,7 +476,7 @@ spf_install_ensure_version() {
         then set "$@" "$SP_ROOT"/usr/local/bin
         else :
       fi &&
-      exec sp-links "${sp_dir?}${sp_base?}"/command "$@" )
+      exec ${DIR}/sp-links "${sp_dir?}${sp_base?}"/command "$@" )
   else :
   fi &&
   spf_hook AFTER_LINKS &&

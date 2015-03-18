@@ -130,7 +130,7 @@ s%\('"${sp_dashdigit?}"'[^/]*\)/.*$%\1%' < "${tmpdir?}"/list &&
       fi &&
       sp_hook BEFORE_UNPACK &&
       { test "${sp_hook_status?}" != 99 || continue; } &&
-      sp-unpack "${sp_path?}"
+      ${DIR}/sp-unpack "${sp_path?}"
     fi &&
     sp_hook AFTER_UNPACK &&
     if test "${sp_hook_status?}" = 99 || test unpack = "$SP_STOP_AFTER"
@@ -256,7 +256,7 @@ s%\('"${sp_dashdigit?}"'[^/]*\)/.*$%\1%' < "${tmpdir?}"/list &&
       else :
     fi &&
 
-    sp-version "${sp_path?}" &&
+    ${DIR}/sp-version "${sp_path?}" &&
     sp_hook AFTER_VERSION &&
     if test "${sp_hook_status?}" = 99 || test version = "$SP_STOP_AFTER"
       then continue

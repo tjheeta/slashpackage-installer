@@ -28,7 +28,7 @@ while test "$#" != 0; do
       then continue
       else :
     fi &&
-    sp-download "${sp_path?}" &&
+    ${DIR}/sp-download "${sp_path?}" &&
     sp_find_tar &&
     if test not_found = "${sp_tar?}"
       then prj_fail "no tarball found for ${sp_path?}"
