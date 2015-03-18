@@ -1,0 +1,8 @@
+- gpg key signing in spf-publish
+- tarball verification on src dl
+- make prj_download not re-download 
+- post install tasks - add user / groups
+- download entire cache instead of snippets
+- make rc+tags for the snippets versioning 
+- fix pkgconfig symlink from sp-link
+- fix site_perl for library
